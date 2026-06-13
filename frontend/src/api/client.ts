@@ -157,3 +157,16 @@ export const habitApi = {
     apiClient.patch(`/habits/${id}/archive`, { archived }),
 };
 
+export const checkInApi = {
+  // POST /api/habits/:id/checkin — mark today complete
+  create: (habitId: string, note?: string) =>
+    apiClient.post(`/habits/${habitId}/checkin`, { note }),
+
+  // DELETE /api/habits/:id/checkin/today — undo today's check-in
+  undo: (habitId: string) =>
+    apiClient.delete(`/habits/${habitId}/checkin/today`),
+
+  // GET /api/habits/:id/history — paginated history + stats
+  history: (habitId: string, page = 1, pageSize = 30) =>
+    apiClient.get(`/habits/${habitId}/history?page=${page}&pageSize=${pageSize}`),
+};

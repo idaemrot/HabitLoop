@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { habitApi } from '../api/client';
-import type { Habit, CreateHabitPayload, UpdateHabitPayload } from '../types';
+import { habitApi, checkInApi } from '../api/client';
+import type { Habit, Streak, CreateHabitPayload, UpdateHabitPayload } from '../types';
 
 // ─── useHabits ────────────────────────────────────────────────────────────────
 // Central data hook for habit management — used by Dashboard and modals
@@ -24,6 +24,13 @@ export function useHabits(includeArchived = false) {
   }, [includeArchived]);
 
   useEffect(() => { void fetchHabits(); }, [fetchHabits]);
+
+  // ── Internal: patch a single habit's streak in state ──────────────────────
+  const updateHabitStreak = useCallback((habitId: string, streak: Streak) => {
+    setHabits((prev) =>
+      prev.map((h) => h.id === habitId ? { ...h, streak } : h),
+    );
+  }, []);
 
   // ── Create ───────────────────────────────────────────────────────────────
   const createHabit = useCallback(async (payload: CreateHabitPayload): Promise<Habit> => {
@@ -58,6 +65,20 @@ export function useHabits(includeArchived = false) {
     );
   }, [includeArchived]);
 
+  // ── Check-in ──────────────────────────────────────────────────────────────
+  const checkIn = useCallback(async (habitId: string): Promise<void> => {
+    const res   = await checkInApi.create(habitId);
+    const streak: Streak = res.data?.data?.streak;
+    if (streak) updateHabitStreak(habitId, streak);
+  }, [updateHabitStreak]);
+
+  // ── Undo check-in ─────────────────────────────────────────────────────────
+  const undoCheckIn = useCallback(async (habitId: string): Promise<void> => {
+    const res   = await checkInApi.undo(habitId);
+    const streak: Streak = res.data?.data?.streak;
+    if (streak) updateHabitStreak(habitId, streak);
+  }, [updateHabitStreak]);
+
   return {
     habits,
     loading,
@@ -67,5 +88,8 @@ export function useHabits(includeArchived = false) {
     updateHabit,
     deleteHabit,
     archiveHabit,
+    checkIn,
+    undoCheckIn,
   };
 }
+

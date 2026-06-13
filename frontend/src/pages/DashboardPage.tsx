@@ -70,6 +70,8 @@ export default function DashboardPage(): JSX.Element {
     updateHabit,
     deleteHabit,
     archiveHabit,
+    checkIn,
+    undoCheckIn,
   } = useHabits(showArchived);
 
   const [modalOpen,    setModalOpen]    = useState(false);
@@ -160,6 +162,8 @@ export default function DashboardPage(): JSX.Element {
                         onEdit={openEdit}
                         onDelete={deleteHabit}
                         onArchive={archiveHabit}
+                        onCheckIn={checkIn}
+                        onUndoCheckIn={undoCheckIn}
                         onError={handleDeleteError}
                       />
                     </div>
@@ -189,6 +193,8 @@ export default function DashboardPage(): JSX.Element {
                         onEdit={openEdit}
                         onDelete={deleteHabit}
                         onArchive={archiveHabit}
+                        onCheckIn={checkIn}
+                        onUndoCheckIn={undoCheckIn}
                         onError={handleDeleteError}
                       />
                     ))}

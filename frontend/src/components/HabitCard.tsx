@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { Habit } from '../types';
 
 // ─── Icon map ─────────────────────────────────────────────────────────────────
@@ -37,13 +38,15 @@ function StreakRing({ current, longest }: { current: number; longest: number }):
 
 // ─── HabitCard ────────────────────────────────────────────────────────────────
 interface HabitCardProps {
-  habit:     Habit;
-  onEdit:    (habit: Habit) => void;
-  onDelete:  (id: string) => Promise<void>;
-  onArchive: (id: string, archived: boolean) => Promise<void>;
+  habit:         Habit;
+  onEdit:        (habit: Habit) => void;
+  onDelete:      (id: string) => Promise<void>;
+  onArchive:     (id: string, archived: boolean) => Promise<void>;
+  onCheckIn:     (id: string) => Promise<void>;
+  onUndoCheckIn: (id: string) => Promise<void>;
   // Called by this card when a delete API request fails.
   // The parent (Dashboard) owns the error display — keeps card stateless.
-  onError:   (message: string) => void;
+  onError:       (message: string) => void;
 }
 
 export default function HabitCard({
@@ -51,6 +54,8 @@ export default function HabitCard({
   onEdit,
   onDelete,
   onArchive,
+  onCheckIn,
+  onUndoCheckIn,
   onError,
 }: HabitCardProps): JSX.Element {
   const streak      = habit.streak;
@@ -58,9 +63,35 @@ export default function HabitCard({
   const longest     = streak?.longestStreak ?? 0;
   const lastCheckIn = streak?.lastCheckIn;
 
-  // Check if checked in today
-  const today         = new Date().toISOString().split('T')[0];
-  const checkedToday  = lastCheckIn?.startsWith(today) ?? false;
+  // Check if checked in today (compare YYYY-MM-DD prefix of ISO string)
+  const today        = new Date().toISOString().split('T')[0];
+  const checkedToday = lastCheckIn
+    ? (typeof lastCheckIn === 'string' ? lastCheckIn : (lastCheckIn as Date).toISOString()).startsWith(today)
+    : false;
+
+  // Local loading state for check-in button — keeps card independent
+  const [isChecking, setIsChecking] = useState(false);
+
+  const handleCheckIn = async (): Promise<void> => {
+    setIsChecking(true);
+    try {
+      if (checkedToday) {
+        await onUndoCheckIn(habit.id);
+      } else {
+        await onCheckIn(habit.id);
+      }
+    } catch (err: unknown) {
+      const code = (err as { response?: { status?: number } })?.response?.status;
+      const msg  = code === 409
+        ? `Already checked in for today!`
+        : checkedToday
+          ? `Failed to undo check-in. Please try again.`
+          : `Failed to check in. Please try again.`;
+      onError(msg);
+    } finally {
+      setIsChecking(false);
+    }
+  };
 
   return (
     <div
@@ -121,6 +152,43 @@ export default function HabitCard({
           </div>
         ))}
       </div>
+
+      {/* Check-in button — primary action, displayed above utility buttons */}
+      {!habit.isArchived && (
+        <button
+          id={`checkin-${habit.id}`}
+          onClick={() => void handleCheckIn()}
+          disabled={isChecking}
+          className={`w-full py-2.5 rounded-xl text-sm font-semibold
+                     transition-all duration-200 flex items-center justify-center gap-2
+                     disabled:opacity-50 disabled:cursor-not-allowed
+                     ${
+                       checkedToday
+                         ? 'bg-lime text-ink hover:bg-red-50 hover:text-red-600 hover:border hover:border-red-200'
+                         : 'bg-ink text-white hover:bg-ink/80'
+                     }`}
+          style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+          title={checkedToday ? 'Click to undo today\'s check-in' : 'Mark as done for today'}
+        >
+          {isChecking ? (
+            <>
+              <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+              </svg>
+              {checkedToday ? 'Undoing…' : 'Checking in…'}
+            </>
+          ) : checkedToday ? (
+            <>
+              <span>✓</span> Done today
+            </>
+          ) : (
+            <>
+              <span>○</span> Check in today
+            </>
+          )}
+        </button>
+      )}
 
       {/* Action buttons */}
       <div className="flex gap-2 pt-1 border-t border-border">
