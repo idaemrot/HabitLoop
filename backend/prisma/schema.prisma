@@ -1,6 +1,14 @@
-// ─── Prisma Schema ────────────────────────────────────────────────────────────
-// Run `npx prisma db push` to sync without migrations (dev)
-// Run `npx prisma migrate dev` to create a named migration
+// ─────────────────────────────────────────────────────────────────────────────
+//  HabitLoop — Prisma Schema  (Task 2 Reviewed & Corrected)
+//  Database: PostgreSQL
+//
+//  Commands:
+//    npx prisma migrate dev --name <migration_name>   create + apply migration
+//    npx prisma migrate deploy                         apply in production
+//    npx prisma db push                               sync without migration (dev only)
+//    npx prisma generate                              regenerate client types
+//    npx prisma studio                                GUI to browse data
+// ─────────────────────────────────────────────────────────────────────────────
 
 generator client {
   provider = "prisma-client-js"
@@ -11,85 +19,374 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ─── Enums ────────────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+//  ENUMS
+// ══════════════════════════════════════════════════════════════════════════════
+
+enum FriendshipStatus {
+  PENDING   // requester sent invite, receiver hasn't responded
+  ACCEPTED  // both users are friends
+  DECLINED  // receiver rejected the request
+  BLOCKED   // one user blocked the other
+}
+
+enum ActivityType {
+  HABIT_CREATED     // user created a new habit
+  HABIT_CHECKED_IN  // user completed a habit for the day
+  HABIT_ARCHIVED    // user archived a habit
+  STREAK_MILESTONE  // user hit a streak milestone (7, 30, 100 days…)
+  FRIENDSHIP_ADDED  // user accepted a friend request
+}
+
 enum HabitFrequency {
   DAILY
   WEEKLY
   CUSTOM
 }
 
-// ─── Models ───────────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+//  USER
+// ══════════════════════════════════════════════════════════════════════════════
 
 model User {
   id           String   @id @default(uuid())
-  email        String   @unique
-  username     String   @unique
-  passwordHash String   @map("password_hash")
-  avatarUrl    String?  @map("avatar_url")
-  timezone     String   @default("UTC")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  username     String   @unique                  @db.VarChar(32)
+  email        String   @unique                  @db.VarChar(255)
+  passwordHash String   @map("password_hash")    @db.VarChar(255)
+  avatarUrl    String?  @map("avatar_url")       @db.VarChar(512)
+  timezone     String   @default("UTC")          @db.VarChar(64)
+  createdAt    DateTime @default(now())           @map("created_at")
+  updatedAt    DateTime @updatedAt               @map("updated_at")
 
-  habits       Habit[]
-  refreshTokens RefreshToken[]
+  // ── Relations ──────────────────────────────────────────────
+  habits              Habit[]
+  habitCheckIns       HabitCheckIn[]
+  streaks             Streak[]
+  activities          Activity[]
+  notifications       Notification[]
+  refreshTokens       RefreshToken[]
 
+  // Friendships (a user can be requester OR receiver)
+  sentFriendRequests     Friendship[] @relation("FriendshipRequester")
+  receivedFriendRequests Friendship[] @relation("FriendshipReceiver")
+
+  // ── Indexes ────────────────────────────────────────────────
+  // [AUDIT-5] email index supports login lookup (SELECT by email on every auth)
+  @@index([email])
   @@map("users")
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  HABIT
+// ══════════════════════════════════════════════════════════════════════════════
 
 model Habit {
   id          String         @id @default(uuid())
   userId      String         @map("user_id")
-  name        String
-  description String?
+  title       String         @db.VarChar(128)
+  description String?        @db.Text
   frequency   HabitFrequency @default(DAILY)
-  targetDays  Int            @default(1)  @map("target_days")
-  color       String         @default("#6366f1")
-  icon        String         @default("flame")
-  isArchived  Boolean        @default(false) @map("is_archived")
-  createdAt   DateTime       @default(now()) @map("created_at")
-  updatedAt   DateTime       @updatedAt @map("updated_at")
+  targetDays  Int            @default(1)          @map("target_days")
+  color       String         @default("#6C5CE7")  @db.VarChar(9)
+  icon        String         @default("flame")    @db.VarChar(64)
+  isArchived  Boolean        @default(false)       @map("is_archived")
+  createdAt   DateTime       @default(now())       @map("created_at")
+  updatedAt   DateTime       @updatedAt            @map("updated_at")
 
+  // ── Relations ──────────────────────────────────────────────
+  // onDelete: Cascade — deleting a User removes all their Habits
   user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  checkIns    CheckIn[]
+  checkIns    HabitCheckIn[]
   streak      Streak?
+  activities  Activity[]
 
+  // ── Indexes ────────────────────────────────────────────────
+  // [AUDIT-5] (userId) for "get all habits for user" query
+  // [AUDIT-5] (userId, isArchived) for "get active habits" dashboard query
+  @@index([userId])
+  @@index([userId, isArchived])
   @@map("habits")
 }
 
-model CheckIn {
-  id        String   @id @default(uuid())
-  habitId   String   @map("habit_id")
-  date      DateTime @db.Date
-  note      String?
-  createdAt DateTime @default(now()) @map("created_at")
+// ══════════════════════════════════════════════════════════════════════════════
+//  HABIT CHECK-IN
+//
+//  [AUDIT-2] DENORMALIZATION DECISION: userId is retained on HabitCheckIn.
+//
+//  JUSTIFICATION:
+//    - Enables direct queries: "all check-ins for user X" without joining Habit
+//    - Required for the calendar view (userId + completedDate composite index)
+//    - BullMQ streak worker queries check-ins grouped by userId across habits
+//
+//  CONSISTENCY GUARANTEE:
+//    - userId here MUST equal habit.userId for the associated Habit.
+//    - This is NEVER taken from the client request. It is ALWAYS set by the
+//      service layer from the authenticated JWT payload (req.user.sub).
+//    - The service validates: habit.userId === req.user.sub before creating
+//      a HabitCheckIn record (see src/services/checkInService.ts).
+//    - Both FK constraints (habitId → Habit, userId → User) are enforced by
+//      PostgreSQL, but cross-field consistency (userId = habit.userId) is
+//      an application-layer invariant enforced at write time only.
+//
+//  TRADEOFF:
+//    - Risk: if a habit were reassigned to another user (not currently
+//      possible), existing check-ins would have stale userId. Since habit
+//      ownership is immutable in this design, the risk is acceptable.
+//    - Alternative (remove userId): every user-level query would require a
+//      JOIN through Habit — acceptable at small scale, measurably slower
+//      at tens of thousands of check-ins per user.
+//
+//  RECOMMENDATION: KEEP userId on HabitCheckIn.
+// ══════════════════════════════════════════════════════════════════════════════
 
-  habit     Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+model HabitCheckIn {
+  id            String   @id @default(uuid())
+  habitId       String   @map("habit_id")
+  // [AUDIT-2] userId denormalised — always populated from JWT, never from client body
+  userId        String   @map("user_id")
+  completedDate DateTime @map("completed_date") @db.Date
+  note          String?  @db.Text
+  createdAt     DateTime @default(now())         @map("created_at")
 
-  @@unique([habitId, date])
-  @@map("check_ins")
+  // ── Relations ──────────────────────────────────────────────
+  // onDelete: Cascade — deleting a Habit removes all its check-ins
+  // onDelete: Cascade — deleting a User removes all their check-ins
+  habit  Habit @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  user   User  @relation(fields: [userId],  references: [id], onDelete: Cascade)
+
+  // ── Constraints ────────────────────────────────────────────
+  // Prevents duplicate check-ins for the same habit on the same calendar day
+  @@unique([habitId, completedDate])
+
+  // ── Indexes ────────────────────────────────────────────────
+  // [AUDIT-5] (userId, completedDate) for calendar view: "all habits checked in on date X"
+  // [AUDIT-5] (habitId) for per-habit history queries
+  @@index([userId, completedDate])
+  @@index([habitId])
+  @@map("habit_check_ins")
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  STREAK  (derived — maintained by BullMQ job, never computed on read)
+//
+//  userId is denormalized here for the same reason as HabitCheckIn:
+//  fast "leaderboard for all friends of user X" queries without joining Habit.
+// ══════════════════════════════════════════════════════════════════════════════
 
 model Streak {
-  id           String   @id @default(uuid())
-  habitId      String   @unique @map("habit_id")
-  currentStreak Int     @default(0)  @map("current_streak")
-  longestStreak Int     @default(0)  @map("longest_streak")
-  lastCheckIn  DateTime? @map("last_check_in")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
+  id            String    @id @default(uuid())
+  habitId       String    @unique @map("habit_id")
+  // [AUDIT-2] userId denormalized — always set from habit.userId at creation, never updated
+  userId        String    @map("user_id")
+  currentStreak Int       @default(0) @map("current_streak")
+  longestStreak Int       @default(0) @map("longest_streak")
+  lastCheckIn   DateTime? @map("last_check_in")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
 
-  habit        Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  // ── Relations ──────────────────────────────────────────────
+  // onDelete: Cascade — deleting a Habit removes its streak record
+  // onDelete: Cascade — deleting a User removes all their streak records
+  habit  Habit @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  user   User  @relation(fields: [userId],  references: [id], onDelete: Cascade)
 
+  // ── Indexes ────────────────────────────────────────────────
+  // [AUDIT-5] (userId) for dashboard and leaderboard queries
+  @@index([userId])
   @@map("streaks")
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  FRIENDSHIP
+//
+//  [AUDIT-1] REVERSE-DUPLICATE RISK
+//
+//  PROBLEM:
+//    @@unique([requesterId, receiverId]) only prevents the EXACT same ordered
+//    pair from appearing twice. It does NOT prevent:
+//      Row 1: requester=A, receiver=B  (A sent request to B)
+//      Row 2: requester=B, receiver=A  (B ALSO sent request to A)
+//    Both rows satisfy the unique constraint independently, creating two
+//    simultaneous friendship records for the same user pair.
+//
+//  DATABASE CONSTRAINT (kept as-is):
+//    @@unique([requesterId, receiverId])
+//
+//  WHY NOT A DB-LEVEL FIX:
+//    A true bidirectional unique (e.g. CHECK requester < receiver) would
+//    require a raw SQL migration and break the semantics of requesterId vs
+//    receiverId (who initiated the friendship). We intentionally keep the
+//    directed model and enforce integrity at the service layer.
+//
+//  SERVICE-LAYER ENFORCEMENT (REQUIRED in src/services/friendshipService.ts):
+//
+//    async function sendFriendRequest(requesterId: string, receiverId: string) {
+//      // ❶ Prevent self-friending
+//      if (requesterId === receiverId) throw new AppError('Cannot friend yourself', 400);
+//
+//      // ❷ Check BOTH directions before inserting
+//      const existing = await prisma.friendship.findFirst({
+//        where: {
+//          OR: [
+//            { requesterId, receiverId },
+//            { requesterId: receiverId, receiverId: requesterId },
+//          ],
+//        },
+//      });
+//
+//      if (existing) {
+//        if (existing.status === 'PENDING')  throw new AppError('Request already pending', 409);
+//        if (existing.status === 'ACCEPTED') throw new AppError('Already friends', 409);
+//        if (existing.status === 'BLOCKED')  throw new AppError('Cannot send request', 403);
+//        if (existing.status === 'DECLINED') {
+//          // Allow re-request after DECLINED: update the row instead of inserting
+//          return prisma.friendship.update({
+//            where: { id: existing.id },
+//            data: { requesterId, receiverId, status: 'PENDING' },
+//          });
+//        }
+//      }
+//
+//      return prisma.friendship.create({ data: { requesterId, receiverId } });
+//    }
+//
+//  RISK RATING: MEDIUM (service enforcement is sufficient given auth guarantees)
+// ══════════════════════════════════════════════════════════════════════════════
+
+model Friendship {
+  id          String           @id @default(uuid())
+  requesterId String           @map("requester_id")
+  receiverId  String           @map("receiver_id")
+  status      FriendshipStatus @default(PENDING)
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt      @map("updated_at")
+
+  // ── Relations ──────────────────────────────────────────────
+  // onDelete: Cascade — deleting either User removes the Friendship row
+  requester User @relation("FriendshipRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  receiver  User @relation("FriendshipReceiver",  fields: [receiverId],  references: [id], onDelete: Cascade)
+
+  // ── Constraints ────────────────────────────────────────────
+  // Prevents the EXACT same directed pair twice.
+  // Reverse-pair prevention is enforced at the service layer (see comment above).
+  @@unique([requesterId, receiverId])
+
+  // ── Indexes ────────────────────────────────────────────────
+  // [AUDIT-5] (receiverId, status) for "pending requests inbox" query
+  // [AUDIT-5] (requesterId, status) for "sent requests" query
+  @@index([receiverId, status])
+  @@index([requesterId, status])
+  @@map("friendships")
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  ACTIVITY  (append-only event log / social feed)
+// ══════════════════════════════════════════════════════════════════════════════
+
+model Activity {
+  id           String       @id @default(uuid())
+  userId       String       @map("user_id")
+  habitId      String?      @map("habit_id")    // null for non-habit activities (e.g. FRIENDSHIP_ADDED)
+  activityType ActivityType @map("activity_type")
+  metadata     Json?        // flexible per-event payload  e.g. { streakCount: 30, milestone: 30 }
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  // ── Relations ──────────────────────────────────────────────
+  // onDelete: Cascade  — deleting a User removes their activity log
+  // onDelete: SetNull  — deleting a Habit nullifies habitId; the log entry is preserved
+  user  User   @relation(fields: [userId],  references: [id], onDelete: Cascade)
+  habit Habit? @relation(fields: [habitId], references: [id], onDelete: SetNull)
+
+  // ── Indexes ────────────────────────────────────────────────
+  // [AUDIT-5] (userId, createdAt DESC) for activity feed: "latest N events for user"
+  // [AUDIT-5] (habitId) for habit-specific activity history
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([habitId])
+  @@map("activities")
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  NOTIFICATION
+// ══════════════════════════════════════════════════════════════════════════════
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  message   String   @db.Text
+  isRead    Boolean  @default(false) @map("is_read")
+  actionUrl String?  @map("action_url") @db.VarChar(512) // optional frontend deep-link
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // ── Relations ──────────────────────────────────────────────
+  // onDelete: Cascade — deleting a User removes all their notifications
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // ── Indexes ────────────────────────────────────────────────
+  // [AUDIT-5] (userId, isRead) for unread count badge query
+  // [AUDIT-5] (userId, createdAt DESC) for notification inbox (latest first)
+  @@index([userId, isRead])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("notifications")
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  REFRESH TOKEN
+//
+//  [AUDIT-4] RECOMMENDATION: KEEP
+//
+//  JUSTIFICATION:
+//    Task 3 implements JWT authentication with a 15-minute access token.
+//    Without refresh tokens, users would be logged out every 15 minutes.
+//    RefreshToken enables:
+//      ❶ Silent re-authentication (better UX)
+//      ❷ Logout invalidation (impossible with stateless access tokens alone)
+//      ❸ Token rotation (each refresh issues a new token, old one deleted)
+//
+//  ROTATION STRATEGY:
+//    On every POST /auth/refresh:
+//      1. Validate the incoming token exists in DB and is not expired.
+//      2. Delete the old RefreshToken row (rotation — prevents token reuse).
+//      3. Issue a new access token (JWT, 15m) + new refresh token.
+//      4. Insert the new RefreshToken row.
+//    If the same old token arrives twice → row not found → force re-login.
+//
+//  LOGOUT INVALIDATION:
+//    POST /auth/logout deletes the RefreshToken row for the user's current
+//    device. Access tokens remain valid until natural expiry (15m), which
+//    is an acceptable window for a stateless system.
+//    For immediate access-token revocation, a Redis blocklist is used
+//    (token jti stored in Redis with TTL = remaining access token lifetime).
+//
+//  SECURITY — HASHING:
+//    The `token` field stores a SHA-256 hash of the actual refresh token
+//    (not the raw value). The raw token is sent to the client only once.
+//    Service pseudocode:
+//      const raw   = crypto.randomBytes(64).toString('hex');
+//      const hashed = crypto.createHash('sha256').update(raw).digest('hex');
+//      await prisma.refreshToken.create({ data: { userId, token: hashed, expiresAt } });
+//      // return raw to client — never store raw in DB
+//    On refresh: hash the incoming token, look up by hash.
+//
+//  COLUMN SIZE:
+//    SHA-256 hex output = 64 chars. VarChar(512) is over-provisioned;
+//    corrected to VarChar(64) to match actual hash length.
+// ══════════════════════════════════════════════════════════════════════════════
 
 model RefreshToken {
   id        String   @id @default(uuid())
   userId    String   @map("user_id")
-  token     String   @unique
+  // [AUDIT-4] Stores SHA-256 hex hash of the raw token — raw token is NEVER persisted
+  token     String   @unique @db.VarChar(64)
   expiresAt DateTime @map("expires_at")
   createdAt DateTime @default(now()) @map("created_at")
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // ── Relations ──────────────────────────────────────────────
+  // onDelete: Cascade — deleting a User removes all their refresh tokens
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  // ── Indexes ────────────────────────────────────────────────
+  // [AUDIT-5] (userId) for "logout all devices" — delete all tokens for user
+  // [AUDIT-5] (expiresAt) for scheduled cleanup job (delete expired tokens)
+  @@index([userId])
+  @@index([expiresAt])
   @@map("refresh_tokens")
 }
