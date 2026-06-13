@@ -49,14 +49,15 @@ enum HabitFrequency {
 // ══════════════════════════════════════════════════════════════════════════════
 
 model User {
-  id           String   @id @default(uuid())
-  username     String   @unique                  @db.VarChar(32)
-  email        String   @unique                  @db.VarChar(255)
-  passwordHash String   @map("password_hash")    @db.VarChar(255)
-  avatarUrl    String?  @map("avatar_url")       @db.VarChar(512)
-  timezone     String   @default("UTC")          @db.VarChar(64)
-  createdAt    DateTime @default(now())           @map("created_at")
-  updatedAt    DateTime @updatedAt               @map("updated_at")
+  id             String    @id @default(uuid())
+  username       String    @unique                  @db.VarChar(32)
+  email          String    @unique                  @db.VarChar(255)
+  passwordHash   String    @map("password_hash")    @db.VarChar(255)
+  avatarUrl      String?   @map("avatar_url")       @db.VarChar(512)
+  timezone       String    @default("UTC")          @db.VarChar(64)
+  lastSweepDate  DateTime? @map("last_sweep_date")
+  createdAt      DateTime  @default(now())          @map("created_at")
+  updatedAt      DateTime  @updatedAt               @map("updated_at")
 
   // ── Relations ──────────────────────────────────────────────
   habits              Habit[]
@@ -73,6 +74,8 @@ model User {
   // ── Indexes ────────────────────────────────────────────────
   // [AUDIT-5] email index supports login lookup (SELECT by email on every auth)
   @@index([email])
+  // [TASK-12.1] lastSweepDate index supports the stale-user query in the daily sweep
+  @@index([lastSweepDate])
   @@map("users")
 }
 

@@ -16,6 +16,7 @@ export const QUEUE_NAMES = {
   STREAK_VALIDATION:    'streak-validation',
   NOTIFICATIONS:        'notifications',
   LEADERBOARD_RECOMPUTE: 'leaderboard-recompute',
+  SYSTEM_CRON:          'system-cron',
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
@@ -61,6 +62,10 @@ export type NotificationJobData =
       toUserId:  string;
       habitId:   string;
       milestone: number;   // 7 | 30 | 100 | 365
+    }
+  | {
+      type:      'DAILY_SUMMARY';
+      userId:    string;
     };
 
 export interface NotificationJobResult {
@@ -99,4 +104,23 @@ export interface LeaderboardJobResult {
   userId:    string;
   delta:     number;   // points added (+) or removed (-)
   operation: 'ADD_SCORE' | 'REMOVE_SCORE' | 'SYNC_USER';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Queue: system-cron
+//
+// Jobs:
+//   DAILY_SWEEP  — fan-out job that runs every hour, fetching users whose
+//                  timezone crossed midnight, and enqueuing unit-of-work
+//                  jobs (validate streak, daily summary, leaderboard sync).
+// ─────────────────────────────────────────────────────────────────────────────
+export type CronJobData =
+  | {
+      type: 'DAILY_SWEEP';
+    };
+
+export interface CronJobResult {
+  usersProcessed:   number;
+  habitsChecked:    number;
+  jobsEnqueued:     number;
 }

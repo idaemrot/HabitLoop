@@ -27,6 +27,8 @@ import {
   type NotificationJobResult,
   type LeaderboardJobData,
   type LeaderboardJobResult,
+  type CronJobData,
+  type CronJobResult,
 } from './types';
 
 // ─── Shared defaults ──────────────────────────────────────────────────────────
@@ -73,12 +75,22 @@ export const leaderboardQueue = new Queue<
   },
 });
 
+// ─── system-cron ──────────────────────────────────────────────────────────────
+export const systemCronQueue = new Queue<
+  CronJobData,
+  CronJobResult
+>(QUEUE_NAMES.SYSTEM_CRON, {
+  connection:        getBullMQConnection(),
+  defaultJobOptions: DEFAULT_JOB_OPTIONS,
+});
+
 // ─── Graceful queue close ─────────────────────────────────────────────────────
 export async function closeQueues(): Promise<void> {
   await Promise.all([
     streakValidationQueue.close(),
     notificationsQueue.close(),
     leaderboardQueue.close(),
+    systemCronQueue.close(),
   ]);
   console.info('🔌 BullMQ queues closed');
 }

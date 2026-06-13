@@ -40,7 +40,9 @@ import type { Worker } from 'bullmq';
 import { createStreakValidationWorker } from './workers/streakWorker';
 import { createNotificationsWorker }    from './workers/notificationsWorker';
 import { createLeaderboardWorker }      from './workers/leaderboardWorker';
+import { createCronWorker }             from './workers/cronWorker';
 import { closeQueues }                  from './queues';
+import { setupScheduler }               from './scheduler';
 
 // Re-export queues so producers can import from a single path
 export { streakValidationQueue, notificationsQueue, leaderboardQueue } from './queues';
@@ -70,11 +72,17 @@ export function startWorkers(): void {
     createStreakValidationWorker(),
     createNotificationsWorker(),
     createLeaderboardWorker(),
+    createCronWorker(),
   ];
+
+  // Initialize repeatable jobs (fire-and-forget)
+  setupScheduler().catch((err: unknown) => {
+    console.error('[BullMQ] failed to setup scheduler:', (err as Error).message);
+  });
 
   console.info(
     `✅ BullMQ workers started (${workers.length} workers: ` +
-    'streak-validation, notifications, leaderboard-recompute)',
+    'streak-validation, notifications, leaderboard-recompute, system-cron)',
   );
 }
 

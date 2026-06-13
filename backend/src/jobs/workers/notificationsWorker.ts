@@ -22,6 +22,7 @@ import { getBullMQConnection }               from '../../config/bullmq';
 import { getIO }                             from '../../sockets';
 import { userRoom }                          from '../../sockets/connectionManager';
 import { SOCKET_EVENTS }                     from '../../sockets/events';
+import { prisma }                            from '../../config/database';
 import {
   QUEUE_NAMES,
   type NotificationJobData,
@@ -63,6 +64,44 @@ async function processNotification(
       console.info(
         `[NotifWorker] STREAK_MILESTONE → user:${toUserId} milestone:${milestone}`,
       );
+      return { delivered: true, channel: 'socket' };
+    }
+
+    case 'DAILY_SUMMARY': {
+      const { userId } = job.data;
+
+      // Calculate "yesterday" for the user. Since this cron runs right after
+      // midnight in the user's local timezone, subtracting 12 hours guarantees
+      // we land on yesterday's date string if needed later.
+
+      // Fetch user timezone to format the string properly
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { timezone: true },
+      });
+
+      if (!user) {
+        return { delivered: false, channel: 'noop' };
+      }
+
+      // We need a helper to format to local date string, or we can just fetch
+      // all their checkins and filter. But since we don't have the string formatter
+      // cleanly exposed here, let's just count total checkins and active habits
+      // for a basic "Morning Summary".
+      const habits = await prisma.habit.count({ where: { userId } });
+      const streaks = await prisma.streak.count({
+        where: { userId, currentStreak: { gt: 0 } },
+      });
+
+      getIO().to(userRoom(userId)).emit(SOCKET_EVENTS.DAILY_SUMMARY, {
+        userId,
+        habitsTracked: habits,
+        activeStreaks: streaks,
+        message: 'Your daily summary is ready! Keep up the good work.',
+        createdAt: new Date().toISOString(),
+      });
+
+      console.info(`[NotifWorker] DAILY_SUMMARY → user:${userId}`);
       return { delivered: true, channel: 'socket' };
     }
 

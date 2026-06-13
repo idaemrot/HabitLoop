@@ -11,6 +11,7 @@
 
 export const SOCKET_EVENTS = {
   // ── Server → Client ────────────────────────────────────────────────────────
+  DAILY_SUMMARY: 'user:daily-summary',
 
   /**
    * A friend completed a habit.
