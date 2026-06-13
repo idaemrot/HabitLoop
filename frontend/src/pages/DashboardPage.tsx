@@ -104,6 +104,12 @@ export default function DashboardPage(): JSX.Element {
           <span className="text-sm text-muted hidden md:block">
             Hey, <strong className="text-ink">{user?.username}</strong> 👋
           </span>
+          <Link
+            to="/leaderboard"
+            className="btn-ghost text-xs px-4 py-2 flex items-center gap-1.5"
+          >
+            🏆 Leaderboard
+          </Link>
           <button
             onClick={() => void logout()}
             className="btn-ghost text-xs px-4 py-2"

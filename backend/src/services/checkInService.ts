@@ -10,7 +10,7 @@ import { cacheSet, cacheDel, CacheKey, TTL } from '../lib/cache';
 import { getIO }                             from '../sockets';
 import { userRoom, isUserOnline }            from '../sockets/connectionManager';
 import { SOCKET_EVENTS }                     from '../sockets/events';
-import { applyCheckInScore }                 from './leaderboardService';
+import { applyCheckInScore, undoCheckInScore } from './leaderboardService';
 import type { HabitCheckIn, Streak } from '@prisma/client';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -18,6 +18,8 @@ export interface CheckInResponse {
   checkIn:     HabitCheckIn;
   streak:      Streak;
   streakStats: StreakResult;
+  /** Streak value BEFORE this check-in. Used by leaderboard for milestone detection. */
+  prevStreak:  number;
 }
 
 export interface HistoryResponse {
@@ -103,6 +105,12 @@ export async function createCheckIn(
         user.timezone,
       );
 
+      // Read current streak BEFORE overwriting it (needed for milestone detection)
+      const prevStreak = (await tx.streak.findUnique({
+        where:  { habitId },
+        select: { currentStreak: true },
+      }))?.currentStreak ?? 0;
+
       // Upsert streak record
       const streak = await tx.streak.upsert({
         where:  { habitId },
@@ -151,7 +159,7 @@ export async function createCheckIn(
         });
       }
 
-      return { checkIn, streak, streakStats };
+      return { checkIn, streak, streakStats, prevStreak };
     });
   } catch (err: unknown) {
     // Prisma unique constraint violation → duplicate check-in
@@ -176,14 +184,36 @@ export async function createCheckIn(
   //    We do this AFTER cache invalidation so any friend's subsequent HTTP fetch gets fresh data.
   void emitCheckInEvents(userId, todayStr, habit, result);
 
-  // 6. Redis Leaderboard Update — fire-and-forget
-  void applyCheckInScore(userId, result.streakStats.currentStreak)
-    .then(() => {
-      // Emit global update event to all connected clients
-      getIO().emit(SOCKET_EVENTS.LEADERBOARD_UPDATED);
+  // 6. Redis Leaderboard Update — fire-and-forget.
+  //    Pass prevStreak so the service can detect milestone crossings accurately.
+  //    If Redis is down, applyCheckInScore returns 0 and never throws.
+  //
+  // ── BullMQ Integration Point (Task 11) ───────────────────────────────────────
+  // Replace with:
+  //   await leaderboardQueue.add('leaderboard', {
+  //     type: 'ADD', userId, prevStreak: result.prevStreak,
+  //     currentStreak: result.streakStats.currentStreak
+  //   });
+  // The BullMQ worker calls applyCheckInScore with automatic retry so no
+  // points are silently lost on Redis downtime.
+  // ─────────────────────────────────────────────────────────────────────────────
+  void applyCheckInScore(userId, result.streakStats.currentStreak, result.prevStreak)
+    .then((delta) => {
+      if (delta > 0) {
+        // Broadcast to all connected clients: leaderboard has new scores.
+        // Clients use this as a hint to re-fetch GET /api/leaderboard.
+        // Failure to emit is silently swallowed — it is informational only.
+        try {
+          getIO().emit(SOCKET_EVENTS.LEADERBOARD_UPDATED, { period: 'alltime' });
+          getIO().emit(SOCKET_EVENTS.LEADERBOARD_UPDATED, { period: 'weekly' });
+          getIO().emit(SOCKET_EVENTS.LEADERBOARD_UPDATED, { period: 'monthly' });
+        } catch (emitErr: unknown) {
+          console.warn('[Leaderboard] socket emit error:', (emitErr as Error).message);
+        }
+      }
     })
-    .catch((err) => {
-      console.error('[Leaderboard] applyCheckInScore error:', (err as Error).message);
+    .catch((leaderboardErr: unknown) => {
+      console.error('[Leaderboard] applyCheckInScore error:', (leaderboardErr as Error).message);
     });
 
   return result;
@@ -330,6 +360,14 @@ export async function undoTodayCheckIn(
   const todayStr      = toLocalDateString(new Date(), user.timezone);
   const completedDate = dateStringToUTC(todayStr);
 
+  // Snapshot streak BEFORE deletion — needed to compute the exact deduction.
+  // Must read outside the transaction so we capture the committed pre-undo value.
+  const preUndoRecord = await prisma.streak.findUnique({
+    where:  { habitId },
+    select: { currentStreak: true },
+  });
+  const streakBeforeUndo = preUndoRecord?.currentStreak ?? 0;
+
   const result = await prisma.$transaction(async (tx) => {
     // Delete today's check-in
     const deleted = await tx.habitCheckIn.deleteMany({
@@ -361,11 +399,10 @@ export async function undoTodayCheckIn(
       },
     });
 
-    return { streak };
+    return { streak, streakAfterUndo: streakStats.currentStreak };
   });
 
   // Cache invalidation — await DEL before return to close the stale-serve race window.
-  // cacheSet not needed here (undo reduces streak; next GET will repopulate from DB).
   await cacheDel(
     CacheKey.habitStreak(habitId),
     CacheKey.streaks(userId),
@@ -373,5 +410,19 @@ export async function undoTodayCheckIn(
     CacheKey.dashboard(userId, true),
   );
 
-  return result;
+  // ── BullMQ Integration Point (Task 11) ───────────────────────────────────────
+  // Replace with:
+  //   await leaderboardQueue.add('leaderboard', {
+  //     type: 'REMOVE', userId,
+  //     streakBeforeUndo, streakAfterUndo: result.streakAfterUndo
+  //   });
+  // The BullMQ worker calls undoCheckInScore with automatic retry so no
+  // deduction is silently skipped on Redis downtime (preventing point farming).
+  // ─────────────────────────────────────────────────────────────────────────────
+  void undoCheckInScore(userId, streakBeforeUndo, result.streakAfterUndo)
+    .catch((err: unknown) => {
+      console.error('[Leaderboard] undoCheckInScore error:', (err as Error).message);
+    });
+
+  return { streak: result.streak };
 }

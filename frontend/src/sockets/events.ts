@@ -5,9 +5,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const SOCKET_EVENTS = {
-  FRIEND_CHECKED_IN: 'friend:checked-in',
-  FRIEND_MILESTONE:  'friend:milestone',
-  STREAK_UPDATED:    'habit:streak-updated',
+  FRIEND_CHECKED_IN:   'friend:checked-in',
+  FRIEND_MILESTONE:    'friend:milestone',
+  STREAK_UPDATED:      'habit:streak-updated',
+  LEADERBOARD_UPDATED: 'leaderboard:updated',
 } as const;
 
 export type SocketEventName = (typeof SOCKET_EVENTS)[keyof typeof SOCKET_EVENTS];

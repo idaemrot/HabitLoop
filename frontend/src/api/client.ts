@@ -180,3 +180,13 @@ export const feedApi = {
     return apiClient.get(`/feed?${params.toString()}`);
   },
 };
+
+export const leaderboardApi = {
+  // GET /api/leaderboard?period=weekly|monthly|alltime[&limit=N]
+  list: (period: 'weekly' | 'monthly' | 'alltime', limit = 50) =>
+    apiClient.get(`/leaderboard?period=${period}&limit=${limit}`),
+
+  // GET /api/leaderboard/me?period=weekly|monthly|alltime
+  myRank: (period: 'weekly' | 'monthly' | 'alltime') =>
+    apiClient.get(`/leaderboard/me?period=${period}`),
+};

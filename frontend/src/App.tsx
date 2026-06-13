@@ -3,11 +3,12 @@ import { AuthProvider } from './store/authContext';
 import ProtectedRoute  from './components/ProtectedRoute';
 
 // ─── Pages ────────────────────────────────────────────────────────────────────
-import LandingPage   from './pages/LandingPage';
-import LoginPage     from './pages/LoginPage';
-import RegisterPage  from './pages/RegisterPage';
-import DashboardPage from './pages/DashboardPage';
-import NotFoundPage  from './pages/NotFoundPage';
+import LandingPage      from './pages/LandingPage';
+import LoginPage        from './pages/LoginPage';
+import RegisterPage     from './pages/RegisterPage';
+import DashboardPage    from './pages/DashboardPage';
+import LeaderboardPage  from './pages/LeaderboardPage';
+import NotFoundPage     from './pages/NotFoundPage';
 
 // ─── HabitLoop App ────────────────────────────────────────────────────────────
 export default function App(): JSX.Element {
@@ -22,7 +23,8 @@ export default function App(): JSX.Element {
 
           {/* ── Protected routes (require auth) ─────────────────────── */}
           <Route element={<ProtectedRoute />}>
-            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/dashboard"   element={<DashboardPage />}   />
+            <Route path="/leaderboard" element={<LeaderboardPage />} />
           </Route>
 
           {/* ── Redirects ───────────────────────────────────────────── */}

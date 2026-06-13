@@ -33,6 +33,14 @@ export const SOCKET_EVENTS = {
    */
   STREAK_UPDATED: 'habit:streak-updated',
 
+  /**
+   * A leaderboard score has changed.
+   * Payload: LeaderboardUpdatedEvent
+   * Broadcast to: all connected clients (global leaderboard board)
+   * Informational only — clients should re-fetch GET /api/leaderboard.
+   */
+  LEADERBOARD_UPDATED: 'leaderboard:updated',
+
 } as const;
 
 // ─── Event Payload Types ──────────────────────────────────────────────────────
@@ -66,4 +74,9 @@ export interface OwnStreakUpdatedEvent {
   currentStreak: number;
   longestStreak: number;
   lastCheckIn:   string | null;
+}
+
+export interface LeaderboardUpdatedEvent {
+  /** Informational only — tells clients to re-fetch GET /api/leaderboard */
+  period: 'weekly' | 'monthly' | 'alltime';
 }
