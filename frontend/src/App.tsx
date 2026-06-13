@@ -7,7 +7,6 @@ import LandingPage      from './pages/LandingPage';
 import LoginPage        from './pages/LoginPage';
 import RegisterPage     from './pages/RegisterPage';
 import DashboardPage    from './pages/DashboardPage';
-import LeaderboardPage  from './pages/LeaderboardPage';
 import NotFoundPage     from './pages/NotFoundPage';
 
 // ─── HabitLoop App ────────────────────────────────────────────────────────────
@@ -23,8 +22,7 @@ export default function App(): JSX.Element {
 
           {/* ── Protected routes (require auth) ─────────────────────── */}
           <Route element={<ProtectedRoute />}>
-            <Route path="/dashboard"   element={<DashboardPage />}   />
-            <Route path="/leaderboard" element={<LeaderboardPage />} />
+            <Route path="/dashboard" element={<DashboardPage />} />
           </Route>
 
           {/* ── Redirects ───────────────────────────────────────────── */}

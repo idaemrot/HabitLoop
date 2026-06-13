@@ -190,3 +190,36 @@ export const leaderboardApi = {
   myRank: (period: 'weekly' | 'monthly' | 'alltime') =>
     apiClient.get(`/leaderboard/me?period=${period}`),
 };
+
+export const usersApi = {
+  // GET /api/users/search?q=<query>
+  search: (q: string) => apiClient.get(`/users/search?q=${encodeURIComponent(q)}`),
+};
+
+export const friendsApi = {
+  // GET /api/friends — list accepted friends
+  list: () => apiClient.get('/friends'),
+
+  // GET /api/friends/requests/pending — incoming requests
+  pendingRequests: () => apiClient.get('/friends/requests/pending'),
+
+  // GET /api/friends/requests/sent — outgoing requests
+  sentRequests: () => apiClient.get('/friends/requests/sent'),
+
+  // POST /api/friends/request — send a friend request
+  sendRequest: (receiverId: string) =>
+    apiClient.post('/friends/request', { receiverId }),
+
+  // PATCH /api/friends/request/:id — accept or decline
+  respond: (friendshipId: string, action: 'ACCEPTED' | 'DECLINED') =>
+    apiClient.patch(`/friends/request/${friendshipId}`, { action }),
+
+  // DELETE /api/friends/request/:id — cancel outgoing request
+  cancelRequest: (friendshipId: string) =>
+    apiClient.delete(`/friends/request/${friendshipId}`),
+
+  // DELETE /api/friends/:id — remove accepted friend
+  remove: (friendshipId: string) =>
+    apiClient.delete(`/friends/${friendshipId}`),
+};
+

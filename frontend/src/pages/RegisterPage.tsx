@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../store/authContext';
 import { HabitChecklistMockup } from '../components/UIMockups';
 
@@ -20,8 +20,12 @@ function getPasswordStrength(pw: string): { score: number; label: string; color:
 
 // ─── Register Page ────────────────────────────────────────────────────────────
 export default function RegisterPage(): JSX.Element {
-  const { register } = useAuth();
+  const { register, user, isLoading } = useAuth();
   const navigate     = useNavigate();
+
+  if (!isLoading && user) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   const [username, setUsername] = useState('');
   const [email,    setEmail]    = useState('');

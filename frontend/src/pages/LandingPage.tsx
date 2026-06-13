@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
+import { useAuth } from '../store/authContext';
 import {
   HabitChecklistMockup,
   StreakProgressMockup,
@@ -8,6 +9,7 @@ import {
 
 // ─── Marketing Landing Page ───────────────────────────────────────────────────
 export default function LandingPage(): JSX.Element {
+  const { user } = useAuth();
   return (
     <div className="min-h-screen bg-canvas">
       <Navbar />
@@ -30,7 +32,11 @@ export default function LandingPage(): JSX.Element {
           HabitLoop turns your intentions into streaks. Track, analyze, and repeat — every single day.
         </p>
         <div className="flex items-center justify-start gap-4 animate-fade-up animate-delay-300">
-          <Link to="/signup" className="btn-lime text-sm px-8 py-3.5">Start for free →</Link>
+          {user ? (
+            <Link to="/dashboard" className="btn-lime text-sm px-8 py-3.5">Go to Dashboard →</Link>
+          ) : (
+            <Link to="/signup" className="btn-lime text-sm px-8 py-3.5">Start for free →</Link>
+          )}
           <a href="#how-it-works" className="btn-ghost text-sm px-8 py-3.5">See how it works</a>
         </div>
         <p className="text-left text-xs text-muted mt-6 animate-fade-up animate-delay-400">
@@ -149,12 +155,20 @@ export default function LandingPage(): JSX.Element {
       <section className="py-32 px-6 max-w-6xl mx-auto text-center">
         <p className="label-upper mb-4">Get started</p>
         <h2 className="display-lg text-ink mb-4" style={{ maxWidth: '600px', margin: '0 auto 1rem' }}>
-          Start your first streak today
+          {user ? 'Ready to continue?' : 'Start your first streak today'}
         </h2>
-        <p className="text-muted mb-10 max-w-md mx-auto text-lg">Free forever. No credit card. Works on every device.</p>
+        <p className="text-muted mb-10 max-w-md mx-auto text-lg">
+          {user ? 'Head to your dashboard to manage your habits.' : 'Free forever. No credit card. Works on every device.'}
+        </p>
         <div className="flex items-center justify-center gap-4">
-          <Link to="/signup" className="btn-lime text-sm px-10 py-4">Create free account →</Link>
-          <Link to="/login" className="btn-ghost text-sm px-10 py-4">Sign in</Link>
+          {user ? (
+            <Link to="/dashboard" className="btn-lime text-sm px-10 py-4">Dashboard →</Link>
+          ) : (
+            <>
+              <Link to="/signup" className="btn-lime text-sm px-10 py-4">Create free account →</Link>
+              <Link to="/login" className="btn-ghost text-sm px-10 py-4">Sign in</Link>
+            </>
+          )}
         </div>
       </section>
 

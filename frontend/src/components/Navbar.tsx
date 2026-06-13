@@ -1,8 +1,10 @@
 import { Link, useLocation } from 'react-router-dom';
+import { useAuth } from '../store/authContext';
 
 // ─── Navbar ────────────────────────────────────────────────────────────────────
 export default function Navbar(): JSX.Element {
   const { pathname } = useLocation();
+  const { user } = useAuth();
   const isHome = pathname === '/';
 
   return (
@@ -35,7 +37,11 @@ export default function Navbar(): JSX.Element {
 
       {/* CTA */}
       <div className="flex items-center gap-3">
-        {isHome ? (
+        {user ? (
+          <Link to="/dashboard" className="btn-lime text-xs px-4 py-2">
+            Dashboard →
+          </Link>
+        ) : isHome ? (
           <>
             <Link to="/login" className="btn-ghost text-xs px-4 py-2">
               Sign in

@@ -1,16 +1,20 @@
 import { useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../store/authContext';
 import { StatsMockup } from '../components/UIMockups';
 
 // ─── Login Page ───────────────────────────────────────────────────────────────
 export default function LoginPage(): JSX.Element {
-  const { login } = useAuth();
+  const { login, user, isLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  if (!isLoading && user) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  const [email, setEmail] = useState('carol@habitloop.dev');
+  const [password, setPassword] = useState('Password1!');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,6 +64,15 @@ export default function LoginPage(): JSX.Element {
           </p>
         </div>
 
+        {/* Test Notice */}
+        <div className="mb-6 px-4 py-3 rounded-xl bg-purple/10 border border-purple/20 text-purple-dark text-sm flex items-start gap-3">
+          <span className="text-lg">👋</span>
+          <div>
+            <p className="font-semibold mb-0.5">Test mode active</p>
+            <p className="text-purple-dark/80 text-xs">Credentials are intentionally pre-filled for testing purposes. Just click Sign In!</p>
+          </div>
+        </div>
+
         {/* Error banner */}
         {error && (
           <div className="mb-5 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-center gap-2">
@@ -69,7 +82,7 @@ export default function LoginPage(): JSX.Element {
         )}
 
         {/* Social login */}
-        <div className="flex flex-col gap-3 mb-6">
+        {/* <div className="flex flex-col gap-3 mb-6">
           <button
             type="button"
             className="btn-ghost w-full justify-center gap-3 py-3"
@@ -83,14 +96,14 @@ export default function LoginPage(): JSX.Element {
             </svg>
             Continue with Google
           </button>
-        </div>
+        </div> */}
 
         {/* Divider */}
-        <div className="flex items-center gap-3 mb-6">
+        {/* <div className="flex items-center gap-3 mb-6">
           <div className="flex-1 h-px bg-border" />
           <span className="text-xs text-muted">or sign in with email</span>
           <div className="flex-1 h-px bg-border" />
-        </div>
+        </div> */}
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>
@@ -191,6 +204,7 @@ export default function LoginPage(): JSX.Element {
               "HabitLoop helped me meditate every day for 3 months straight."
             </p>
             <p className="text-xs text-white/40 mt-2 font-medium">— Manish Daemrot, Product Designer</p>
+
           </div>
         </div>
       </div>

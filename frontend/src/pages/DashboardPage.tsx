@@ -5,6 +5,8 @@ import { useHabits } from '../hooks/useHabits';
 import HabitCard from '../components/HabitCard';
 import HabitModal from '../components/HabitModal';
 import FriendFeed from '../components/FriendFeed';
+import FriendsModal from '../components/FriendsModal';
+import LeaderboardModal from '../components/LeaderboardModal';
 import Toast from '../components/Toast';
 import type { Habit } from '../types';
 
@@ -13,10 +15,9 @@ function EmptyState({ onAdd }: { onAdd: () => void }): JSX.Element {
   return (
     <div className="flex flex-col items-center justify-center py-24 text-center">
       <div
-        className="w-20 h-20 rounded-2xl flex items-center justify-center text-4xl mb-6 animate-float"
-        style={{ background: 'linear-gradient(135deg, #6C5CE7 0%, #74C0FC 100%)' }}
+        className="w-16 h-16 rounded-2xl flex items-center justify-center mb-6 animate-float bg-canvas border border-border shadow-sm text-ink font-bold font-mono text-2xl"
       >
-        🔁
+        H
       </div>
       <h3 className="display-md text-ink mb-2">No habits yet</h3>
       <p className="text-muted text-sm max-w-xs mb-8 leading-relaxed">
@@ -38,20 +39,19 @@ function StatsBar({ habits }: { habits: Habit[] }): JSX.Element {
   const doneToday   = habits.filter((h) => h.streak?.lastCheckIn?.startsWith(today)).length;
 
   const stats = [
-    { label: 'Habits',          value: total,       icon: '📋' },
-    { label: 'Total streak',    value: `${totalStreak}d`, icon: '🔥' },
-    { label: 'Best streak',     value: `${best}d`,   icon: '🏆' },
-    { label: 'Done today',      value: `${doneToday}/${total}`, icon: '✅' },
+    { label: 'Habits',          value: total },
+    { label: 'Total streak',    value: `${totalStreak}d` },
+    { label: 'Best streak',     value: `${best}d` },
+    { label: 'Done today',      value: `${doneToday}/${total}` },
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
       {stats.map((s) => (
-        <div key={s.label} className="card px-5 py-4 flex items-center gap-3">
-          <span className="text-2xl">{s.icon}</span>
+        <div key={s.label} className="card px-6 py-5 flex items-center gap-3">
           <div>
-            <p className="display-sm text-ink text-lg leading-none">{s.value}</p>
-            <p className="label-upper mt-0.5" style={{ fontSize: '10px' }}>{s.label}</p>
+            <p className="display-sm text-ink text-2xl leading-none">{s.value}</p>
+            <p className="label-upper mt-1 tracking-wider text-muted/80">{s.label}</p>
           </div>
         </div>
       ))}
@@ -75,9 +75,11 @@ export default function DashboardPage(): JSX.Element {
     undoCheckIn,
   } = useHabits(showArchived);
 
-  const [modalOpen,    setModalOpen]    = useState(false);
-  const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
-  const [deleteError,  setDeleteError]  = useState<string | null>(null);
+  const [modalOpen,        setModalOpen]        = useState(false);
+  const [editingHabit,     setEditingHabit]     = useState<Habit | null>(null);
+  const [deleteError,      setDeleteError]      = useState<string | null>(null);
+  const [friendsOpen,      setFriendsOpen]      = useState(false);
+  const [leaderboardOpen,  setLeaderboardOpen]  = useState(false);
 
   // Stable callback — passed down to every HabitCard as onError
   const handleDeleteError = useCallback((msg: string) => setDeleteError(msg), []);
@@ -99,16 +101,28 @@ export default function DashboardPage(): JSX.Element {
           </span>
         </Link>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           <span className="text-sm text-muted hidden md:block">
-            Hey, <strong className="text-ink">{user?.username}</strong> 👋
+            Hey, <strong className="text-ink">{user?.username}</strong>
           </span>
-          <Link
-            to="/leaderboard"
-            className="btn-ghost text-xs px-4 py-2 flex items-center gap-1.5"
-          >
-            🏆 Leaderboard
-          </Link>
+          <div className="relative">
+            <button
+              onClick={() => setFriendsOpen((v) => !v)}
+              className={`btn-ghost text-xs px-4 py-2 ${friendsOpen ? 'bg-ink text-white border-ink' : ''}`}
+            >
+              Friends
+            </button>
+            {friendsOpen && <FriendsModal onClose={() => setFriendsOpen(false)} />}
+          </div>
+          <div className="relative">
+            <button
+              onClick={() => setLeaderboardOpen((v) => !v)}
+              className={`btn-ghost text-xs px-4 py-2 ${leaderboardOpen ? 'bg-ink text-white border-ink' : ''}`}
+            >
+              Leaderboard
+            </button>
+            {leaderboardOpen && <LeaderboardModal onClose={() => setLeaderboardOpen(false)} />}
+          </div>
           <button
             onClick={() => void logout()}
             className="btn-ghost text-xs px-4 py-2"
@@ -119,7 +133,7 @@ export default function DashboardPage(): JSX.Element {
       </nav>
 
       {/* ── Main content ─────────────────────────────────────────────────── */}
-      <main className="pt-24 pb-16 px-6 max-w-5xl mx-auto">
+      <main className="pt-24 pb-16 px-6 md:px-12 w-full max-w-[1800px] mx-auto">
         {/* Page header */}
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -137,12 +151,12 @@ export default function DashboardPage(): JSX.Element {
         {/* Error state */}
         {error && (
           <div className="mb-6 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">
-            ⚠️ {error}
+            {error}
           </div>
         )}
 
         {/* Two-column layout for Habits + Feed */}
-        <div className="flex flex-col lg:flex-row gap-8">
+        <div className="flex flex-col lg:flex-row gap-12">
           
           {/* Main Column — Habits */}
           <div className="flex-1 min-w-0">
@@ -233,6 +247,8 @@ export default function DashboardPage(): JSX.Element {
         onCreate={async (payload) => { await createHabit(payload); }}
         onUpdate={async (id, payload) => { await updateHabit(id, payload); }}
       />
+
+
 
       {/* ── Delete error toast ───────────────────────────────────── */}
       <Toast

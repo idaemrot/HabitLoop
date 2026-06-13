@@ -8,7 +8,7 @@ import { registerSchema, loginSchema } from '../validators/authValidators';
 // ─── Stricter rate limit for auth endpoints ────────────────────────────────────
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,  // 15 minutes
-  max: 10,                    // 10 attempts per window
+  max: 50,                    // 50 attempts per window
   standardHeaders: true,
   legacyHeaders: false,
   message: { status: 'error', message: 'Too many auth attempts — please wait 15 minutes.' },

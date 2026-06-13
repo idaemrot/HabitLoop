@@ -25,7 +25,7 @@ const envSchema = z.object({
 
   // Rate Limiting
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(900_000),
-  RATE_LIMIT_MAX: z.coerce.number().default(100),
+  RATE_LIMIT_MAX: z.coerce.number().default(1_000),
 });
 
 // ─── Parse & Export ──────────────────────────────────────────────────────────

@@ -1,0 +1,135 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  # ─── PULL REQUEST: Lint & Test ──────────────────────────────────────────────
+  lint-and-test:
+    name: PR Checks (Lint & Test)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            frontend/package-lock.json
+            backend/package-lock.json
+
+      - name: Install Frontend Dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Install Backend Dependencies
+        working-directory: ./backend
+        run: npm ci
+
+      - name: Lint Frontend
+        working-directory: ./frontend
+        run: npm run lint
+
+      - name: Lint Backend
+        working-directory: ./backend
+        run: npm run lint
+
+      - name: Test Frontend
+        working-directory: ./frontend
+        # Runs the test script if it exists in package.json
+        run: npm test --if-present
+
+      - name: Test Backend
+        working-directory: ./backend
+        # Runs the test script if it exists in package.json
+        run: npm test --if-present
+
+  # ─── MAIN BRANCH: Build & Push Docker Images ────────────────────────────────
+  build-and-push:
+    name: Build & Push Docker Images
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    
+    # Required for pushing to GitHub Container Registry (GHCR)
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            frontend/package-lock.json
+            backend/package-lock.json
+
+      # 1. Build Backend
+      - name: Install & Build Backend
+        working-directory: ./backend
+        run: |
+          npm ci
+          npx prisma generate
+          npm run build
+
+      # 2. Build Frontend
+      - name: Install & Build Frontend
+        working-directory: ./frontend
+        run: |
+          npm ci
+          npm run build
+
+      # 3. Setup Docker Buildx
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 4. Login to GitHub Container Registry
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 5. Build and Push Backend Image
+      - name: Build and Push Backend Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: ghcr.io/${{ github.repository }}/habitloop-backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # 6. Build and Push Worker Image
+      - name: Build and Push Worker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/worker.Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository }}/habitloop-worker:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # 6. Build and Push Frontend Image
+      - name: Build and Push Frontend Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: ghcr.io/${{ github.repository }}/habitloop-frontend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

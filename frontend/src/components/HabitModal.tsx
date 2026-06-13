@@ -129,22 +129,22 @@ export default function HabitModal({
   const selectedIconLabel = ICONS.find((i) => i.value === icon)?.label ?? '🔥';
 
   return (
-    <>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ pointerEvents: 'none' }}>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-40 bg-black/30"
-        style={{ backdropFilter: 'blur(4px)' }}
+        className="absolute inset-0 bg-black/30"
+        style={{ backdropFilter: 'blur(4px)', pointerEvents: 'auto' }}
         onClick={onClose}
       />
 
       {/* Modal panel */}
       <div
-        className="fixed z-50 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2
-                   w-full max-w-md bg-surface rounded-3xl shadow-panel
-                   border border-border animate-fade-up flex flex-col max-h-[90vh]"
+        className="relative z-10 w-full max-w-md bg-surface rounded-2xl shadow-panel
+                   border border-border animate-fade-up flex flex-col"
+        style={{ maxHeight: 'min(90vh, 640px)', pointerEvents: 'auto' }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-border">
+        <div className="flex items-center justify-between px-6 pt-5 pb-3 border-b border-border">
           <div>
             <p className="label-upper">
               {isEdit ? 'Edit habit' : 'New habit'}
@@ -164,7 +164,7 @@ export default function HabitModal({
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4 overflow-y-auto">
+        <form onSubmit={handleSubmit} className="px-6 py-4 space-y-3 overflow-y-auto flex-1 min-h-0">
           {/* Global error */}
           {error && (
             <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">
@@ -207,7 +207,7 @@ export default function HabitModal({
               onChange={(e) => setDescription(e.target.value)}
               className="input-field resize-none"
               placeholder="What does this habit involve?"
-              rows={2}
+              rows={1}
               maxLength={500}
             />
           </div>
@@ -278,18 +278,18 @@ export default function HabitModal({
           </div>
 
           {/* Preview pill */}
-          <div className="flex items-center gap-3 p-3 rounded-xl bg-canvas border border-border">
+          <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-canvas border border-border">
             <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-base flex-shrink-0"
               style={{ backgroundColor: color }}
             >
               {selectedIconLabel}
             </div>
             <div>
-              <p className="text-sm font-semibold text-ink">
+              <p className="text-sm font-semibold text-ink leading-none">
                 {title.trim() || 'Your habit name'}
               </p>
-              <p className="text-xs text-muted">
+              <p className="text-xs text-muted mt-0.5">
                 {frequency.charAt(0) + frequency.slice(1).toLowerCase()}
                 {description.trim() ? ` · ${description.slice(0, 30)}${description.length > 30 ? '…' : ''}` : ''}
               </p>
@@ -297,7 +297,7 @@ export default function HabitModal({
           </div>
 
           {/* Actions */}
-          <div className="flex gap-3 pt-1">
+          <div className="flex gap-3">
             <button
               type="button"
               onClick={onClose}
@@ -325,6 +325,6 @@ export default function HabitModal({
           </div>
         </form>
       </div>
-    </>
+    </div>
   );
 }

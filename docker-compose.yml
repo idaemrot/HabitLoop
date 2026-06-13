@@ -1,5 +1,18 @@
 version: '3.9'
 
+# ─── Shared environment fragment ──────────────────────────────────────────────
+x-backend-env: &backend-env
+  NODE_ENV: ${NODE_ENV:-production}
+  DATABASE_URL: postgresql://${POSTGRES_USER:-habitloop}:${POSTGRES_PASSWORD:-habitloop_secret}@postgres:5432/${POSTGRES_DB:-habitloop_db}
+  REDIS_URL: redis://redis:6379
+  JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+  JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
+  JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
+  JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+  CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:80}
+  RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-1000}
+  RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-900000}
+
 services:
   # ─── PostgreSQL ─────────────────────────────────────────────────────────────
   postgres:
@@ -11,7 +24,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-habitloop_secret}
       POSTGRES_DB: ${POSTGRES_DB:-habitloop_db}
     ports:
-      - '5433:5432'
+      - '${POSTGRES_PORT:-5432}:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -19,15 +32,16 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 20s
 
   # ─── Redis ──────────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
     container_name: habitloop_redis
     restart: unless-stopped
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     ports:
-      - '6379:6379'
+      - '${REDIS_PORT:-6379}:6379'
     volumes:
       - redis_data:/data
     healthcheck:
@@ -35,56 +49,67 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
 
   # ─── Backend API ─────────────────────────────────────────────────────────────
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-      target: development
+      target: production
+    image: habitloop-backend:latest
     container_name: habitloop_backend
     restart: unless-stopped
     environment:
-      NODE_ENV: development
+      <<: *backend-env
       PORT: 4000
-      DATABASE_URL: postgresql://${POSTGRES_USER:-habitloop}:${POSTGRES_PASSWORD:-habitloop_secret}@postgres:5432/${POSTGRES_DB:-habitloop_db}
-      REDIS_URL: redis://redis:6379
-      JWT_SECRET: ${JWT_SECRET:-changeme_in_production_jwt_secret}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-changeme_in_production_refresh_secret}
-      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
-      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
     ports:
-      - '4000:4000'
-    volumes:
-      - ./backend/src:/app/src
-      - ./backend/prisma:/app/prisma
+      - '${BACKEND_PORT:-4000}:4000'
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: npm run dev
 
-  # ─── Frontend ────────────────────────────────────────────────────────────────
+  # ─── Worker (BullMQ) ─────────────────────────────────────────────────────────
+  worker:
+    build:
+      context: ./backend
+      dockerfile: worker.Dockerfile
+      target: production
+    image: habitloop-worker:latest
+    container_name: habitloop_worker
+    restart: unless-stopped
+    environment:
+      <<: *backend-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
+
+  # ─── Frontend (Nginx) ────────────────────────────────────────────────────────
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      target: development
+      target: production
+    image: habitloop-frontend:latest
     container_name: habitloop_frontend
     restart: unless-stopped
-    environment:
-      VITE_API_URL: ${VITE_API_URL:-http://localhost:4000/api}
-      VITE_SOCKET_URL: ${VITE_SOCKET_URL:-http://localhost:4000}
     ports:
-      - '5173:5173'
-    volumes:
-      - ./frontend/src:/app/src
-      - ./frontend/public:/app/public
+      - '${FRONTEND_PORT:-80}:80'
     depends_on:
       - backend
 
 volumes:
   postgres_data:
+    driver: local
   redis_data:
+    driver: local
+
+networks:
+  default:
+    name: habitloop_network

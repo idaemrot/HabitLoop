@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { useAuth } from '../store/authContext';
 import { useLeaderboard, type LeaderboardPeriod, type LeaderboardEntry } from '../hooks/useLeaderboard';
 
@@ -181,8 +182,18 @@ export default function LeaderboardPage(): JSX.Element {
         className="sticky top-0 z-40 px-6 py-4 border-b border-border flex items-center justify-between"
         style={{ backgroundColor: 'var(--canvas)', backdropFilter: 'blur(12px)' }}
       >
-        <div className="flex items-center gap-3">
-          <span className="text-xl">🏆</span>
+        <div className="flex items-center gap-4">
+          <Link
+            to="/dashboard"
+            className="flex items-center gap-1.5 text-sm text-muted hover:text-ink transition-colors"
+            style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 500 }}
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+            Dashboard
+          </Link>
+          <div className="w-px h-5 bg-border" />
           <div>
             <p className="label-upper mb-0.5">HabitLoop</p>
             <h1 className="display-sm text-ink leading-none">Leaderboard</h1>
@@ -262,7 +273,6 @@ export default function LeaderboardPage(): JSX.Element {
               Array.from({ length: 10 }).map((_, i) => <SkeletonRow key={i} />)
             ) : entries.length === 0 ? (
               <div className="py-16 text-center">
-                <p className="text-3xl mb-3">🏆</p>
                 <p className="text-sm text-muted">No scores yet for this period.</p>
                 <p className="text-xs text-muted mt-1">Be the first — go check in a habit!</p>
               </div>
