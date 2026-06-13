@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
+import cookieParser from 'cookie-parser';
 
 import { env } from './config/env';
 import apiRouter from './routes';
@@ -40,6 +41,7 @@ export function createApp(): express.Application {
   app.use(compression());
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true }));
+  app.use(cookieParser());  // required to read httpOnly refresh token cookie
 
   // ── Logging ───────────────────────────────────────────────────────────────
   if (env.NODE_ENV !== 'test') {

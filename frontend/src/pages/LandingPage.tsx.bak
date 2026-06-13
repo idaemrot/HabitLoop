@@ -1,10 +1,9 @@
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../store/authContext';
 import { useHabits } from '../hooks/useHabits';
 import HabitCard from '../components/HabitCard';
 import HabitModal from '../components/HabitModal';
-import Toast from '../components/Toast';
 import type { Habit } from '../types';
 
 // ─── Empty state ──────────────────────────────────────────────────────────────
@@ -72,12 +71,8 @@ export default function DashboardPage(): JSX.Element {
     archiveHabit,
   } = useHabits(showArchived);
 
-  const [modalOpen,    setModalOpen]    = useState(false);
+  const [modalOpen,   setModalOpen]   = useState(false);
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
-  const [deleteError,  setDeleteError]  = useState<string | null>(null);
-
-  // Stable callback — passed down to every HabitCard as onError
-  const handleDeleteError = useCallback((msg: string) => setDeleteError(msg), []);
 
   const openCreate = (): void => { setEditingHabit(null); setModalOpen(true); };
   const openEdit   = (h: Habit): void => { setEditingHabit(h); setModalOpen(true); };
@@ -160,7 +155,6 @@ export default function DashboardPage(): JSX.Element {
                         onEdit={openEdit}
                         onDelete={deleteHabit}
                         onArchive={archiveHabit}
-                        onError={handleDeleteError}
                       />
                     </div>
                   ))}
@@ -189,7 +183,6 @@ export default function DashboardPage(): JSX.Element {
                         onEdit={openEdit}
                         onDelete={deleteHabit}
                         onArchive={archiveHabit}
-                        onError={handleDeleteError}
                       />
                     ))}
                   </div>
@@ -207,12 +200,6 @@ export default function DashboardPage(): JSX.Element {
         onClose={closeModal}
         onCreate={async (payload) => { await createHabit(payload); }}
         onUpdate={async (id, payload) => { await updateHabit(id, payload); }}
-      />
-
-      {/* ── Delete error toast ───────────────────────────────────── */}
-      <Toast
-        message={deleteError}
-        onDismiss={() => setDeleteError(null)}
       />
     </div>
   );

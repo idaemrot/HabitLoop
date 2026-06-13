@@ -1,19 +1,42 @@
-import axios from 'axios';
+import axios, { type AxiosResponse, type InternalAxiosRequestConfig } from 'axios';
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  HabitLoop API Client
+//
+//  Token strategy (per spec):
+//    - Access token  → stored in memory only (React state via AuthContext)
+//    - Refresh token → httpOnly secure cookie (set by server, never JS-readable)
+//
+//  Never use localStorage for tokens.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000/api';
+
+// ─── In-memory access token store ─────────────────────────────────────────────
+// This module holds a single reference that AuthContext writes to after login/refresh.
+// It is intentionally NOT exported as a reactive value — use AuthContext for that.
+let _accessToken: string | null = null;
+
+export function setAccessToken(token: string | null): void {
+  _accessToken = token;
+}
+
+export function getAccessToken(): string | null {
+  return _accessToken;
+}
 
 // ─── Axios Instance ───────────────────────────────────────────────────────────
 export const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL ?? 'http://localhost:4000/api',
-  timeout: 10_000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  withCredentials: true,
+  baseURL:         BASE_URL,
+  timeout:         10_000,
+  headers:         { 'Content-Type': 'application/json' },
+  withCredentials: true,  // required — sends httpOnly refresh cookie to /api/auth/*
 });
 
-// ─── Request Interceptor — Attach JWT ─────────────────────────────────────────
+// ─── Request Interceptor — Attach access token from memory ───────────────────
 apiClient.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('access_token');
+  (config: InternalAxiosRequestConfig) => {
+    const token = getAccessToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -22,39 +45,115 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error),
 );
 
-// ─── Response Interceptor — Handle 401 ────────────────────────────────────────
+// ─── Response Interceptor — Auto-refresh on 401 ───────────────────────────────
+let isRefreshing = false;
+let refreshQueue: Array<(token: string) => void> = [];
+
+function processQueue(newToken: string): void {
+  refreshQueue.forEach((resolve) => resolve(newToken));
+  refreshQueue = [];
+}
+
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response: AxiosResponse) => response,
   async (error) => {
-    const originalRequest = error.config as { _retry?: boolean } & typeof error.config;
+    const original = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-    // Attempt token refresh on 401
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-
-      try {
-        const refreshToken = localStorage.getItem('refresh_token');
-        const { data } = await axios.post<{ accessToken: string }>(
-          `${import.meta.env.VITE_API_URL ?? 'http://localhost:4000/api'}/auth/refresh`,
-          { refreshToken },
-        );
-
-        localStorage.setItem('access_token', data.accessToken);
-        originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
-        return apiClient(originalRequest);
-      } catch {
-        // Refresh failed — clear tokens and redirect to login
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        window.location.href = '/login';
-      }
+    // Only intercept 401 on non-auth endpoints (avoid infinite loop on /auth/refresh)
+    const isAuthEndpoint = original.url?.includes('/auth/');
+    if (error.response?.status !== 401 || original._retry || isAuthEndpoint) {
+      return Promise.reject(error);
     }
 
-    return Promise.reject(error);
+    // If already refreshing, queue this request
+    if (isRefreshing) {
+      return new Promise<AxiosResponse>((resolve, reject) => {
+        refreshQueue.push((newToken: string) => {
+          original.headers.Authorization = `Bearer ${newToken}`;
+          original._retry = true;
+          resolve(apiClient(original));
+        });
+        // Reject after 10s if refresh never resolves
+        setTimeout(() => reject(new Error('Refresh timeout')), 10_000);
+      });
+    }
+
+    original._retry = true;
+    isRefreshing = true;
+
+    try {
+      // POST /api/auth/refresh — refresh token sent automatically via httpOnly cookie
+      const { data } = await axios.post<{ status: string; data: { accessToken: string } }>(
+        `${BASE_URL}/auth/refresh`,
+        {},
+        { withCredentials: true },
+      );
+
+      const newToken = data.data.accessToken;
+      setAccessToken(newToken);
+      processQueue(newToken);
+
+      original.headers.Authorization = `Bearer ${newToken}`;
+      return apiClient(original);
+    } catch (refreshError) {
+      // Refresh failed — clear token and redirect to login
+      setAccessToken(null);
+      refreshQueue = [];
+      window.location.href = '/login';
+      return Promise.reject(refreshError);
+    } finally {
+      isRefreshing = false;
+    }
   },
 );
 
-// ─── Health API ───────────────────────────────────────────────────────────────
+// ─── Typed API helpers ─────────────────────────────────────────────────────────
 export const healthApi = {
   check: () => apiClient.get<{ status: string; timestamp: string }>('/health'),
 };
+
+export const authApi = {
+  register: (body: { username: string; email: string; password: string }) =>
+    apiClient.post('/auth/register', body),
+
+  login: (body: { email: string; password: string }) =>
+    apiClient.post('/auth/login', body),
+
+  refresh: () => apiClient.post('/auth/refresh'),
+
+  logout: () => apiClient.post('/auth/logout'),
+
+  me: () => apiClient.get('/auth/me'),
+};
+
+export const habitApi = {
+  list:    (archived = false) =>
+    apiClient.get(`/habits${archived ? '?archived=true' : ''}`),
+
+  getById: (id: string) =>
+    apiClient.get(`/habits/${id}`),
+
+  create: (body: {
+    title:        string;
+    description?: string;
+    frequency?:   string;
+    color?:       string;
+    icon?:        string;
+  }) => apiClient.post('/habits', body),
+
+  update: (id: string, body: {
+    title?:       string;
+    description?: string;
+    frequency?:   string;
+    color?:       string;
+    icon?:        string;
+    isArchived?:  boolean;
+  }) => apiClient.patch(`/habits/${id}`, body),
+
+  delete: (id: string) =>
+    apiClient.delete(`/habits/${id}`),
+
+  archive: (id: string, archived = true) =>
+    apiClient.patch(`/habits/${id}/archive`, { archived }),
+};
+
