@@ -9,7 +9,7 @@
 // We expose a factory so each Queue and Worker gets its own connection.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { env } from '../env';
+import { env } from './env';
 
 export function getBullMQConnection(): { url: string } {
   return { url: env.REDIS_URL };

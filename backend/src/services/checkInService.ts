@@ -8,10 +8,10 @@ import {
 } from '../lib/streak';
 import { cacheSet, cacheDel, CacheKey, TTL } from '../lib/cache';
 import { getIO }                             from '../sockets';
-import { userRoom, isUserOnline }            from '../sockets/connectionManager';
+import { userRoom }                          from '../sockets/connectionManager';
 import { SOCKET_EVENTS }                     from '../sockets/events';
-import { applyCheckInScore, undoCheckInScore } from './leaderboardService';
-import type { HabitCheckIn, Streak } from '@prisma/client';
+import { leaderboardQueue, notificationsQueue } from '../jobs';
+import type { HabitCheckIn, Streak }         from '@prisma/client';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface CheckInResponse {
@@ -182,39 +182,25 @@ export async function createCheckIn(
 
   // 5. Real-time fanout — fire-and-forget; socket failure must not fail the HTTP response.
   //    We do this AFTER cache invalidation so any friend's subsequent HTTP fetch gets fresh data.
-  void emitCheckInEvents(userId, todayStr, habit, result);
+  void emitCheckInEvents(userId, habit, result);
 
-  // 6. Redis Leaderboard Update — fire-and-forget.
-  //    Pass prevStreak so the service can detect milestone crossings accurately.
-  //    If Redis is down, applyCheckInScore returns 0 and never throws.
-  //
-  // ── BullMQ Integration Point (Task 11) ───────────────────────────────────────
-  // Replace with:
-  //   await leaderboardQueue.add('leaderboard', {
-  //     type: 'ADD', userId, prevStreak: result.prevStreak,
-  //     currentStreak: result.streakStats.currentStreak
-  //   });
-  // The BullMQ worker calls applyCheckInScore with automatic retry so no
-  // points are silently lost on Redis downtime.
-  // ─────────────────────────────────────────────────────────────────────────────
-  void applyCheckInScore(userId, result.streakStats.currentStreak, result.prevStreak)
-    .then((delta) => {
-      if (delta > 0) {
-        // Broadcast to all connected clients: leaderboard has new scores.
-        // Clients use this as a hint to re-fetch GET /api/leaderboard.
-        // Failure to emit is silently swallowed — it is informational only.
-        try {
-          getIO().emit(SOCKET_EVENTS.LEADERBOARD_UPDATED, { period: 'alltime' });
-          getIO().emit(SOCKET_EVENTS.LEADERBOARD_UPDATED, { period: 'weekly' });
-          getIO().emit(SOCKET_EVENTS.LEADERBOARD_UPDATED, { period: 'monthly' });
-        } catch (emitErr: unknown) {
-          console.warn('[Leaderboard] socket emit error:', (emitErr as Error).message);
-        }
-      }
-    })
-    .catch((leaderboardErr: unknown) => {
-      console.error('[Leaderboard] applyCheckInScore error:', (leaderboardErr as Error).message);
-    });
+  // 6. Redis Leaderboard Update — fire-and-forget push to BullMQ.
+  //    The worker handles Redis failures via automatic retry, eliminating
+  //    the silent-point-loss risk.
+  leaderboardQueue.add(
+    'leaderboard',
+    {
+      type:          'ADD_SCORE',
+      userId,
+      prevStreak:    result.prevStreak,
+      currentStreak: result.streakStats.currentStreak,
+    },
+    { jobId: `checkin:${result.checkIn.id}` },
+  ).catch((err: unknown) => {
+    // If Redis is down, we can't even enqueue the job.
+    // In a production system, we'd log this or push to a fallback local file.
+    console.error('[Queue] failed to enqueue ADD_SCORE:', (err as Error).message);
+  });
 
   return result;
 }
@@ -228,7 +214,6 @@ export async function createCheckIn(
 // ─────────────────────────────────────────────────────────────────────────────
 async function emitCheckInEvents(
   userId:    string,
-  todayStr:  string,
   habit:     { id: string; title: string; color: string; icon: string },
   result:    CheckInResponse,
 ): Promise<void> {
@@ -241,21 +226,6 @@ async function emitCheckInEvents(
       select: { username: true, avatarUrl: true },
     });
     if (!user) return;
-
-    // Build the friend check-in payload
-    const friendCheckInPayload = {
-      activityId:    result.checkIn.id,
-      userId,
-      username:      user.username,
-      avatarUrl:     user.avatarUrl,
-      habitId:       habit.id,
-      habitTitle:    habit.title,
-      habitColor:    habit.color,
-      habitIcon:     habit.icon,
-      currentStreak: result.streak.currentStreak,
-      completedDate: todayStr,
-      createdAt:     result.checkIn.createdAt.toISOString(),
-    };
 
     // Resolve friend IDs (only accepted friendships)
     const friendships = await prisma.friendship.findMany({
@@ -270,14 +240,21 @@ async function emitCheckInEvents(
       f.requesterId === userId ? f.receiverId : f.requesterId,
     );
 
-    // Emit to each online friend's personal room
+    // Enqueue to BullMQ instead of emitting directly
     for (const friendId of friendIds) {
-      if (isUserOnline(friendId)) {
-        io.to(userRoom(friendId)).emit(SOCKET_EVENTS.FRIEND_CHECKED_IN, friendCheckInPayload);
-      }
+      notificationsQueue.add('friend_checkin', {
+        type:       'FRIEND_CHECKIN',
+        toUserId:   friendId,
+        fromUserId: userId,
+        habitTitle: habit.title,
+        streak:     result.streak.currentStreak,
+      }).catch((err: unknown) => {
+        console.error('[Queue] failed to enqueue FRIEND_CHECKIN:', (err as Error).message);
+      });
     }
 
     // Also emit streak update to the user's own room (refreshes other open tabs)
+    // We keep this direct for immediate UI responsiveness.
     io.to(userRoom(userId)).emit(SOCKET_EVENTS.STREAK_UPDATED, {
       habitId:       habit.id,
       currentStreak: result.streak.currentStreak,
@@ -369,14 +346,19 @@ export async function undoTodayCheckIn(
   const streakBeforeUndo = preUndoRecord?.currentStreak ?? 0;
 
   const result = await prisma.$transaction(async (tx) => {
-    // Delete today's check-in
-    const deleted = await tx.habitCheckIn.deleteMany({
+    // Find today's check-in so we can use its ID for deduplication
+    const checkIn = await tx.habitCheckIn.findFirst({
       where: { habitId, completedDate },
     });
 
-    if (deleted.count === 0) {
+    if (!checkIn) {
       throw new AppError('No check-in found for today', 404);
     }
+
+    // Delete it
+    await tx.habitCheckIn.delete({
+      where: { id: checkIn.id },
+    });
 
     // Recalculate streaks from remaining check-ins
     const allDates = await tx.habitCheckIn.findMany({
@@ -399,7 +381,7 @@ export async function undoTodayCheckIn(
       },
     });
 
-    return { streak, streakAfterUndo: streakStats.currentStreak };
+    return { streak, streakAfterUndo: streakStats.currentStreak, checkInId: checkIn.id };
   });
 
   // Cache invalidation — await DEL before return to close the stale-serve race window.
@@ -410,19 +392,19 @@ export async function undoTodayCheckIn(
     CacheKey.dashboard(userId, true),
   );
 
-  // ── BullMQ Integration Point (Task 11) ───────────────────────────────────────
-  // Replace with:
-  //   await leaderboardQueue.add('leaderboard', {
-  //     type: 'REMOVE', userId,
-  //     streakBeforeUndo, streakAfterUndo: result.streakAfterUndo
-  //   });
-  // The BullMQ worker calls undoCheckInScore with automatic retry so no
-  // deduction is silently skipped on Redis downtime (preventing point farming).
-  // ─────────────────────────────────────────────────────────────────────────────
-  void undoCheckInScore(userId, streakBeforeUndo, result.streakAfterUndo)
-    .catch((err: unknown) => {
-      console.error('[Leaderboard] undoCheckInScore error:', (err as Error).message);
-    });
+  // Push to BullMQ for reliable, retryable execution
+  leaderboardQueue.add(
+    'leaderboard',
+    {
+      type:             'REMOVE_SCORE',
+      userId,
+      streakBeforeUndo,
+      streakAfterUndo:  result.streakAfterUndo,
+    },
+    { jobId: `undo:${result.checkInId}` },
+  ).catch((err: unknown) => {
+    console.error('[Queue] failed to enqueue REMOVE_SCORE:', (err as Error).message);
+  });
 
   return { streak: result.streak };
 }

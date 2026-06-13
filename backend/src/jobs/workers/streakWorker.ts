@@ -19,15 +19,15 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { Worker, type Job } from 'bullmq';
-import { getBullMQConnection } from '../config/bullmq';
-import { prisma } from '../config/database';
-import { calculateStreaks } from '../lib/streak';
-import { cacheDel, CacheKey } from '../lib/cache';
+import { getBullMQConnection } from '../../config/bullmq';
+import { prisma } from '../../config/database';
+import { calculateStreaks } from '../../lib/streak';
+import { cacheDel, CacheKey } from '../../lib/cache';
 import {
   QUEUE_NAMES,
   type StreakValidationJobData,
   type StreakValidationJobResult,
-} from './types';
+} from '../types';
 
 // ─── Processor ───────────────────────────────────────────────────────────────
 async function processStreakValidation(

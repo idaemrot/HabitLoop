@@ -1,61 +1,98 @@
-import { Queue, Worker } from 'bullmq';
-import { env } from '../config/env';
+// ─── BullMQ Job System — Entry Point ─────────────────────────────────────────
+//
+// Exports:
+//   startWorkers()  — called once at server boot from src/index.ts
+//   stopWorkers()   — called during graceful shutdown
+//   Queue instances — imported by producer call sites (checkInService, etc.)
+//
+// Architecture:
+//   ┌─────────────────────────────────────────────────────────────┐
+//   │  HTTP Request Handler (checkInService, undoTodayCheckIn)    │
+//   │                                                             │
+//   │  leaderboardQueue.add('ADD_SCORE' | 'REMOVE_SCORE', data)  │
+//   │  streakValidationQueue.add('VALIDATE_STREAK', data)        │
+//   │  notificationsQueue.add('FRIEND_CHECKIN', data)            │
+//   └─────────────────┬───────────────────────────────────────────┘
+//                     │  Redis (BullMQ sorted sets + lists)
+//   ┌─────────────────▼───────────────────────────────────────────┐
+//   │  Workers (same Node.js process, separate ioredis connection) │
+//   │                                                             │
+//   │  createLeaderboardWorker()    concurrency: 10              │
+//   │  createStreakValidationWorker() concurrency: 5             │
+//   │  createNotificationsWorker()  concurrency: 20              │
+//   └─────────────────────────────────────────────────────────────┘
+//
+// Worker isolation:
+//   Workers run in the SAME Node.js process as the HTTP server. This is
+//   the recommended approach for a monolith. If scaling requires, the
+//   workers can be extracted to a separate process by importing this module
+//   from a dedicated worker entrypoint (e.g. src/worker.ts).
+//
+// Dead-letter strategy:
+//   Jobs that exhaust all 5 attempts transition to the "failed" state.
+//   They are retained in Redis according to removeOnFail: { count: 1000 }.
+//   The admin endpoint GET /api/jobs/failed surfaces these for inspection.
+//   Manual replay: queue.retryJobs({ count: N, state: 'failed' }).
+// ─────────────────────────────────────────────────────────────────────────────
 
-// ─── BullMQ Connection Options ────────────────────────────────────────────────
-// BullMQ bundles its own ioredis internally, so we pass connection options
-// directly (URL string) rather than sharing the singleton Redis client.
-function getConnectionOptions(): { url: string } {
-  return { url: env.REDIS_URL };
-}
+import type { Worker } from 'bullmq';
 
-// ─── Queue Names ──────────────────────────────────────────────────────────────
-export const QUEUE_NAMES = {
-  STREAK_CALCULATION: 'streak:calculation',
-  NOTIFICATIONS: 'notifications',
-  EMAIL: 'email',
-} as const;
+import { createStreakValidationWorker } from './workers/streakWorker';
+import { createNotificationsWorker }    from './workers/notificationsWorker';
+import { createLeaderboardWorker }      from './workers/leaderboardWorker';
+import { closeQueues }                  from './queues';
 
-export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
+// Re-export queues so producers can import from a single path
+export { streakValidationQueue, notificationsQueue, leaderboardQueue } from './queues';
+export { QUEUE_NAMES }                                                 from './types';
+export type {
+  StreakValidationJobData,
+  NotificationJobData,
+  LeaderboardJobData,
+}                                                                      from './types';
 
-// ─── Queue Factory ────────────────────────────────────────────────────────────
-export function createQueue(name: QueueName): Queue {
-  return new Queue(name, {
-    connection: getConnectionOptions(),
-    defaultJobOptions: {
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 1000 },
-      removeOnComplete: { count: 100 },
-      removeOnFail: { count: 50 },
-    },
-  });
-}
+// ─── Worker registry ──────────────────────────────────────────────────────────
+let workers: Worker[] = [];
 
-// ─── Queue Instances ──────────────────────────────────────────────────────────
-export const streakQueue = createQueue(QUEUE_NAMES.STREAK_CALCULATION);
-export const notificationQueue = createQueue(QUEUE_NAMES.NOTIFICATIONS);
-export const emailQueue = createQueue(QUEUE_NAMES.EMAIL);
-
-// ─── Worker Stubs (to be implemented per feature) ────────────────────────────
+// ─── startWorkers ─────────────────────────────────────────────────────────────
+/**
+ * Instantiates all workers and registers them in the module-level registry.
+ * Must be called once after Redis is connected (connectRedis() resolves).
+ * Idempotent: calling twice is a no-op (workers already running).
+ */
 export function startWorkers(): void {
-  // Streak calculation worker
-  new Worker(
-    QUEUE_NAMES.STREAK_CALCULATION,
-    async (job) => {
-      // TODO: Implement streak calculation logic
-      console.info(`Processing job ${job.id} in ${QUEUE_NAMES.STREAK_CALCULATION}`);
-    },
-    { connection: getConnectionOptions() },
-  );
+  if (workers.length > 0) {
+    console.warn('[BullMQ] startWorkers() called more than once — skipped');
+    return;
+  }
 
-  // Notification worker
-  new Worker(
-    QUEUE_NAMES.NOTIFICATIONS,
-    async (job) => {
-      // TODO: Implement notification dispatch logic
-      console.info(`Processing job ${job.id} in ${QUEUE_NAMES.NOTIFICATIONS}`);
-    },
-    { connection: getConnectionOptions() },
-  );
+  workers = [
+    createStreakValidationWorker(),
+    createNotificationsWorker(),
+    createLeaderboardWorker(),
+  ];
 
-  console.info('✅ BullMQ workers started');
+  console.info(
+    `✅ BullMQ workers started (${workers.length} workers: ` +
+    'streak-validation, notifications, leaderboard-recompute)',
+  );
+}
+
+// ─── stopWorkers ──────────────────────────────────────────────────────────────
+/**
+ * Gracefully shuts down all workers and queues.
+ * Should be called during SIGTERM / SIGINT handling.
+ *
+ * Each worker.close() waits for the current job to finish (up to the
+ * forcedShutdownTimeout) before terminating. This prevents data corruption
+ * on mid-flight jobs.
+ */
+export async function stopWorkers(): Promise<void> {
+  console.info('[BullMQ] Closing workers...');
+
+  await Promise.all(workers.map((w) => w.close()));
+  await closeQueues();
+
+  workers = [];
+  console.info('🔌 BullMQ workers stopped');
 }

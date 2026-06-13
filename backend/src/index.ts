@@ -3,7 +3,7 @@ import { env } from './config/env';
 import { connectDatabase, disconnectDatabase } from './config/database';
 import { connectRedis, disconnectRedis } from './config/redis';
 import { initializeSocket } from './sockets';
-import { startWorkers } from './jobs';
+import { startWorkers, stopWorkers } from './jobs';
 import { createApp } from './app';
 
 async function bootstrap(): Promise<void> {
@@ -33,6 +33,7 @@ async function bootstrap(): Promise<void> {
     console.info(`\n⚡ ${signal} received — shutting down gracefully...`);
 
     httpServer.close(async () => {
+      await stopWorkers();
       await disconnectDatabase();
       await disconnectRedis();
       console.info('👋 Goodbye!');
