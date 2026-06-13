@@ -4,6 +4,7 @@ import { useAuth } from '../store/authContext';
 import { useHabits } from '../hooks/useHabits';
 import HabitCard from '../components/HabitCard';
 import HabitModal from '../components/HabitModal';
+import FriendFeed from '../components/FriendFeed';
 import Toast from '../components/Toast';
 import type { Habit } from '../types';
 
@@ -135,75 +136,88 @@ export default function DashboardPage(): JSX.Element {
           </div>
         )}
 
-        {/* Loading skeleton */}
-        {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="card p-5 h-48 animate-pulse bg-border/40" />
-            ))}
-          </div>
-        ) : habits.length === 0 ? (
-          <EmptyState onAdd={openCreate} />
-        ) : (
-          <>
-            {/* Active habits */}
-            {activeHabits.length > 0 && (
+        {/* Two-column layout for Habits + Feed */}
+        <div className="flex flex-col lg:flex-row gap-8">
+          
+          {/* Main Column — Habits */}
+          <div className="flex-1 min-w-0">
+            {/* Loading skeleton */}
+            {loading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="card p-5 h-48 animate-pulse bg-border/40" />
+                ))}
+              </div>
+            ) : habits.length === 0 ? (
+              <EmptyState onAdd={openCreate} />
+            ) : (
               <>
-                <div className="flex items-center gap-3 mb-4">
-                  <hr className="divider flex-1" />
-                  <p className="label-upper">Active · {activeHabits.length}</p>
-                  <hr className="divider flex-1" />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-                  {activeHabits.map((h) => (
-                    <div key={h.id} className="animate-fade-up">
-                      <HabitCard
-                        habit={h}
-                        onEdit={openEdit}
-                        onDelete={deleteHabit}
-                        onArchive={archiveHabit}
-                        onCheckIn={checkIn}
-                        onUndoCheckIn={undoCheckIn}
-                        onError={handleDeleteError}
-                      />
+                {/* Active habits */}
+                {activeHabits.length > 0 && (
+                  <>
+                    <div className="flex items-center gap-3 mb-4">
+                      <hr className="divider flex-1" />
+                      <p className="label-upper">Active · {activeHabits.length}</p>
+                      <hr className="divider flex-1" />
                     </div>
-                  ))}
-                </div>
-              </>
-            )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                      {activeHabits.map((h) => (
+                        <div key={h.id} className="animate-fade-up">
+                          <HabitCard
+                            habit={h}
+                            onEdit={openEdit}
+                            onDelete={deleteHabit}
+                            onArchive={archiveHabit}
+                            onCheckIn={checkIn}
+                            onUndoCheckIn={undoCheckIn}
+                            onError={handleDeleteError}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
 
-            {/* Archived section toggle */}
-            {archivedHabits.length > 0 && (
-              <div className="mt-4">
-                <button
-                  onClick={() => setShowArchived((v) => !v)}
-                  className="flex items-center gap-2 text-xs text-muted hover:text-ink transition-colors mb-4"
-                  style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-                >
-                  <span>{showArchived ? '▼' : '▶'}</span>
-                  Archived · {archivedHabits.length}
-                </button>
+                {/* Archived section toggle */}
+                {archivedHabits.length > 0 && (
+                  <div className="mt-4">
+                    <button
+                      onClick={() => setShowArchived((v) => !v)}
+                      className="flex items-center gap-2 text-xs text-muted hover:text-ink transition-colors mb-4"
+                      style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                    >
+                      <span>{showArchived ? '▼' : '▶'}</span>
+                      Archived · {archivedHabits.length}
+                    </button>
 
-                {showArchived && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {archivedHabits.map((h) => (
-                      <HabitCard
-                        key={h.id}
-                        habit={h}
-                        onEdit={openEdit}
-                        onDelete={deleteHabit}
-                        onArchive={archiveHabit}
-                        onCheckIn={checkIn}
-                        onUndoCheckIn={undoCheckIn}
-                        onError={handleDeleteError}
-                      />
-                    ))}
+                    {showArchived && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {archivedHabits.map((h) => (
+                          <HabitCard
+                            key={h.id}
+                            habit={h}
+                            onEdit={openEdit}
+                            onDelete={deleteHabit}
+                            onArchive={archiveHabit}
+                            onCheckIn={checkIn}
+                            onUndoCheckIn={undoCheckIn}
+                            onError={handleDeleteError}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
+              </>
             )}
-          </>
-        )}
+          </div>
+
+          {/* Sidebar Column — Activity Feed */}
+          <aside className="w-full lg:w-[320px] shrink-0">
+            <FriendFeed />
+          </aside>
+          
+        </div>
       </main>
 
       {/* ── Modals ───────────────────────────────────────────────────────── */}

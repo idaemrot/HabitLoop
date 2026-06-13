@@ -170,3 +170,13 @@ export const checkInApi = {
   history: (habitId: string, page = 1, pageSize = 30) =>
     apiClient.get(`/habits/${habitId}/history?page=${page}&pageSize=${pageSize}`),
 };
+
+export const feedApi = {
+  // GET /api/feed — cursor-based paginated feed
+  list: (limit = 20, cursor?: string) => {
+    const params = new URLSearchParams();
+    params.append('limit', limit.toString());
+    if (cursor) params.append('cursor', cursor);
+    return apiClient.get(`/feed?${params.toString()}`);
+  },
+};

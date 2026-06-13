@@ -7,6 +7,10 @@ import {
   type StreakResult,
 } from '../lib/streak';
 import { cacheSet, cacheDel, CacheKey, TTL } from '../lib/cache';
+import { getIO }                             from '../sockets';
+import { userRoom, isUserOnline }            from '../sockets/connectionManager';
+import { SOCKET_EVENTS }                     from '../sockets/events';
+import { applyCheckInScore }                 from './leaderboardService';
 import type { HabitCheckIn, Streak } from '@prisma/client';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -168,7 +172,92 @@ export async function createCheckIn(
   );
   void cacheSet(CacheKey.habitStreak(result.checkIn.habitId), result.streak, TTL.HABIT_STREAK);
 
+  // 5. Real-time fanout — fire-and-forget; socket failure must not fail the HTTP response.
+  //    We do this AFTER cache invalidation so any friend's subsequent HTTP fetch gets fresh data.
+  void emitCheckInEvents(userId, todayStr, habit, result);
+
+  // 6. Redis Leaderboard Update — fire-and-forget
+  void applyCheckInScore(userId, result.streakStats.currentStreak)
+    .then(() => {
+      // Emit global update event to all connected clients
+      getIO().emit(SOCKET_EVENTS.LEADERBOARD_UPDATED);
+    })
+    .catch((err) => {
+      console.error('[Leaderboard] applyCheckInScore error:', (err as Error).message);
+    });
+
   return result;
+}
+
+// ─── emitCheckInEvents ────────────────────────────────────────────────────────
+// Fetches accepted friends, then emits:
+//   'friend:checked-in'   → to each friend's personal room
+//   'habit:streak-updated' → to the requester's own room (multi-tab refresh)
+//
+// All errors are swallowed — this is best-effort social fanout.
+// ─────────────────────────────────────────────────────────────────────────────
+async function emitCheckInEvents(
+  userId:    string,
+  todayStr:  string,
+  habit:     { id: string; title: string; color: string; icon: string },
+  result:    CheckInResponse,
+): Promise<void> {
+  try {
+    const io = getIO();
+
+    // Fetch user public profile (username, avatarUrl)
+    const user = await prisma.user.findUnique({
+      where:  { id: userId },
+      select: { username: true, avatarUrl: true },
+    });
+    if (!user) return;
+
+    // Build the friend check-in payload
+    const friendCheckInPayload = {
+      activityId:    result.checkIn.id,
+      userId,
+      username:      user.username,
+      avatarUrl:     user.avatarUrl,
+      habitId:       habit.id,
+      habitTitle:    habit.title,
+      habitColor:    habit.color,
+      habitIcon:     habit.icon,
+      currentStreak: result.streak.currentStreak,
+      completedDate: todayStr,
+      createdAt:     result.checkIn.createdAt.toISOString(),
+    };
+
+    // Resolve friend IDs (only accepted friendships)
+    const friendships = await prisma.friendship.findMany({
+      where: {
+        status: 'ACCEPTED',
+        OR: [{ requesterId: userId }, { receiverId: userId }],
+      },
+      select: { requesterId: true, receiverId: true },
+    });
+
+    const friendIds = friendships.map((f) =>
+      f.requesterId === userId ? f.receiverId : f.requesterId,
+    );
+
+    // Emit to each online friend's personal room
+    for (const friendId of friendIds) {
+      if (isUserOnline(friendId)) {
+        io.to(userRoom(friendId)).emit(SOCKET_EVENTS.FRIEND_CHECKED_IN, friendCheckInPayload);
+      }
+    }
+
+    // Also emit streak update to the user's own room (refreshes other open tabs)
+    io.to(userRoom(userId)).emit(SOCKET_EVENTS.STREAK_UPDATED, {
+      habitId:       habit.id,
+      currentStreak: result.streak.currentStreak,
+      longestStreak: result.streak.longestStreak,
+      lastCheckIn:   result.streak.lastCheckIn?.toISOString() ?? null,
+    });
+  } catch (err) {
+    // Log but never throw — WebSocket fanout failures must not affect HTTP responses
+    console.error('[Socket] emitCheckInEvents error:', (err as Error).message);
+  }
 }
 
 // ─── GET /api/habits/:id/history ─────────────────────────────────────────────

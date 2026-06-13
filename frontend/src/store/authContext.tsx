@@ -8,6 +8,7 @@ import {
 } from 'react';
 import type { User } from '../types';
 import { authApi, setAccessToken } from '../api/client';
+import { useSocket }               from '../hooks/useSocket';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface AuthContextValue {
@@ -29,8 +30,12 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
 export function AuthProvider({ children }: { children: ReactNode }): JSX.Element {
-  const [user,      setUser]      = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);  // true on mount — check session
+  const [user,        setUser]        = useState<User | null>(null);
+  const [isLoading,   setIsLoading]   = useState(true);  // true on mount — check session
+  const [accessToken, setAccessTokenState] = useState<string | null>(null);
+
+  // Wire socket lifecycle to access token — connects when authenticated, disconnects on logout
+  useSocket(accessToken);
 
   // ── Attempt to restore session via refresh cookie on app load ─────────────
   useEffect(() => {
@@ -44,6 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
         if (!newToken) throw new Error('No token in refresh response');
 
         setAccessToken(newToken);
+        setAccessTokenState(newToken);
 
         // Fetch full user profile with the new access token
         const meRes = await authApi.me();
@@ -53,6 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
       } catch {
         // No valid session — user is logged out
         setAccessToken(null);
+        setAccessTokenState(null);
         if (!cancelled) setUser(null);
       } finally {
         if (!cancelled) setIsLoading(false);
@@ -66,9 +73,10 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
   // ── Login ─────────────────────────────────────────────────────────────────
   const login = useCallback(async (email: string, password: string): Promise<void> => {
     const res = await authApi.login({ email, password }) as AuthApiResponse;
-    const { user: loggedInUser, accessToken } = res.data.data;
+    const { user: loggedInUser, accessToken: token } = res.data.data;
 
-    setAccessToken(accessToken);
+    setAccessToken(token);
+    setAccessTokenState(token);
     setUser(loggedInUser);
   }, []);
 
@@ -76,9 +84,10 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
   const register = useCallback(
     async (username: string, email: string, password: string): Promise<void> => {
       const res = await authApi.register({ username, email, password }) as AuthApiResponse;
-      const { user: newUser, accessToken } = res.data.data;
+      const { user: newUser, accessToken: token } = res.data.data;
 
-      setAccessToken(accessToken);
+      setAccessToken(token);
+      setAccessTokenState(token);
       setUser(newUser);
     },
     [],
@@ -92,6 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
       // Even if logout API fails, clear client state
     } finally {
       setAccessToken(null);
+      setAccessTokenState(null);
       setUser(null);
       window.location.href = '/login';
     }

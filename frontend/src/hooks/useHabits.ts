@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { habitApi, checkInApi } from '../api/client';
+import { useStreakUpdates }      from './useSocket';
 import type { Habit, Streak, CreateHabitPayload, UpdateHabitPayload } from '../types';
 
 // ─── useHabits ────────────────────────────────────────────────────────────────
@@ -26,11 +27,16 @@ export function useHabits(includeArchived = false) {
   useEffect(() => { void fetchHabits(); }, [fetchHabits]);
 
   // ── Internal: patch a single habit's streak in state ──────────────────────
-  const updateHabitStreak = useCallback((habitId: string, streak: Streak) => {
+  const updateHabitStreak = useCallback((habitId: string, streak: Partial<Streak>) => {
     setHabits((prev) =>
-      prev.map((h) => h.id === habitId ? { ...h, streak } : h),
+      prev.map((h) => h.id === habitId ? { ...h, streak: { ...h.streak, ...streak } as Streak } : h),
     );
   }, []);
+
+  // ── Real-time streak updates from Socket.IO ───────────────────────────────
+  // When a 'habit:streak-updated' event arrives (e.g. from another open tab),
+  // patch the streak in local state without triggering a full refetch.
+  useStreakUpdates(updateHabitStreak);
 
   // ── Create ───────────────────────────────────────────────────────────────
   const createHabit = useCallback(async (payload: CreateHabitPayload): Promise<Habit> => {
