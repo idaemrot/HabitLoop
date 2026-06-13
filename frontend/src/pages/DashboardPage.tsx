@@ -93,9 +93,8 @@ export default function DashboardPage(): JSX.Element {
     <div className="min-h-screen bg-canvas">
       {/* ── Navbar ──────────────────────────────────────────────────────── */}
       <nav className="navbar">
-        <Link to="/" className="flex items-center gap-2">
-          <span className="w-8 h-8 rounded-lg bg-lime flex items-center justify-center text-base">🔁</span>
-          <span className="display-sm text-sm text-ink" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700 }}>
+        <Link to="/" className="flex items-center group w-fit">
+          <span className="display-sm text-sm text-ink group-hover:text-purple transition-colors" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700 }}>
             HabitLoop
           </span>
         </Link>

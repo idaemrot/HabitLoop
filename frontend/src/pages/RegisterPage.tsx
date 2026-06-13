@@ -111,7 +111,6 @@ export default function RegisterPage(): JSX.Element {
       <div className="flex-1 flex flex-col justify-center px-8 py-16 max-w-lg mx-auto w-full">
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2 mb-12 group w-fit">
-          <span className="w-8 h-8 rounded-lg bg-lime flex items-center justify-center text-base">🔁</span>
           <span
             className="font-bold text-ink group-hover:text-purple transition-colors"
             style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: '1.1rem' }}

@@ -195,7 +195,7 @@ export async function createCheckIn(
       prevStreak:    result.prevStreak,
       currentStreak: result.streakStats.currentStreak,
     },
-    { jobId: `checkin:${result.checkIn.id}` },
+    { jobId: `checkin-${result.checkIn.id}` },
   ).catch((err: unknown) => {
     // If Redis is down, we can't even enqueue the job.
     // In a production system, we'd log this or push to a fallback local file.
@@ -401,7 +401,7 @@ export async function undoTodayCheckIn(
       streakBeforeUndo,
       streakAfterUndo:  result.streakAfterUndo,
     },
-    { jobId: `undo:${result.checkInId}` },
+    { jobId: `undo-${result.checkInId}` },
   ).catch((err: unknown) => {
     console.error('[Queue] failed to enqueue REMOVE_SCORE:', (err as Error).message);
   });

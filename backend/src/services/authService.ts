@@ -139,7 +139,7 @@ export async function refreshAccessToken(
   const newHashedRefresh = hashRefreshToken(newRawRefresh);
 
   await prisma.$transaction([
-    prisma.refreshToken.delete({ where: { id: record.id } }),
+    prisma.refreshToken.deleteMany({ where: { id: record.id } }),
     prisma.refreshToken.create({
       data: {
         userId:    user.id,

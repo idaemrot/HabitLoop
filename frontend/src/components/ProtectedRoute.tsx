@@ -6,10 +6,13 @@ function SessionLoader(): JSX.Element {
   return (
     <div className="min-h-screen bg-canvas flex items-center justify-center">
       <div className="flex flex-col items-center gap-4">
-        <span className="w-10 h-10 rounded-xl bg-lime flex items-center justify-center text-xl animate-pulse-lime">
-          🔁
+        <span
+          className="display-sm text-xl text-ink animate-pulse"
+          style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700 }}
+        >
+          HabitLoop
         </span>
-        <p className="text-sm text-muted" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+        <p className="text-sm text-muted">
           Restoring session…
         </p>
       </div>

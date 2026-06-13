@@ -118,19 +118,7 @@ body {
            hover:shadow-card-hover;
   }
   .card-accent {
-    @apply rounded-2xl border-0 overflow-hidden relative;
-    background: linear-gradient(135deg, #6C5CE7 0%, #74C0FC 100%);
-    background-size: 32px 32px, 32px 32px, 100% 100%;
-  }
-  .card-accent::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background-image:
-      linear-gradient(rgba(255,255,255,0.08) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px);
-    background-size: 32px 32px;
-    pointer-events: none;
+    @apply bg-surface rounded-2xl border border-border shadow-panel relative overflow-hidden;
   }
 
   /* ── Dark Panel (floating overlay mockup) ────────────────────────────── */
@@ -190,12 +178,9 @@ body {
     -webkit-backdrop-filter: blur(12px);
   }
 
-  /* ── Gradient text ───────────────────────────────────────────────────── */
-  .text-gradient {
-    background: linear-gradient(135deg, #6C5CE7 0%, #74C0FC 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+  /* ── Solid text ──────────────────────────────────────────────────────── */
+  .text-solid {
+    color: var(--ink);
   }
   .text-lime-accent { color: var(--lime); }
 }

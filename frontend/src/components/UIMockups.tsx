@@ -119,35 +119,3 @@ export function StatsMockup(): JSX.Element {
   );
 }
 
-// Reminder toggle mockup
-export function ReminderMockup(): JSX.Element {
-  const reminders = [
-    { label: 'Morning reminder', time: '7:00 AM', on: true  },
-    { label: 'Evening check-in', time: '9:00 PM', on: true  },
-    { label: 'Weekly review',    time: 'Sunday',  on: false },
-  ];
-
-  return (
-    <div className="panel-dark w-full max-w-xs">
-      <p className="label-upper text-white/40 mb-3">Reminders</p>
-      <div className="space-y-2.5">
-        {reminders.map((r) => (
-          <div key={r.label} className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-white">{r.label}</p>
-              <p className="text-[10px] text-white/40">{r.time}</p>
-            </div>
-            {/* Toggle */}
-            <div
-              className={`w-9 h-5 rounded-full flex items-center px-0.5 cursor-pointer transition-all duration-200 ${
-                r.on ? 'bg-lime justify-end' : 'bg-white/10 justify-start'
-              }`}
-            >
-              <div className={`w-4 h-4 rounded-full ${r.on ? 'bg-ink' : 'bg-white/30'}`} />
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}

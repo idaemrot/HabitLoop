@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import type { Habit } from '../types';
 
 // ─── Icon map ─────────────────────────────────────────────────────────────────
@@ -71,8 +71,11 @@ export default function HabitCard({
 
   // Local loading state for check-in button — keeps card independent
   const [isChecking, setIsChecking] = useState(false);
+  const isCheckingRef = useRef(false);
 
   const handleCheckIn = async (): Promise<void> => {
+    if (isCheckingRef.current) return;
+    isCheckingRef.current = true;
     setIsChecking(true);
     try {
       if (checkedToday) {
@@ -90,6 +93,7 @@ export default function HabitCard({
       onError(msg);
     } finally {
       setIsChecking(false);
+      isCheckingRef.current = false;
     }
   };
 

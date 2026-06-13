@@ -140,7 +140,7 @@ async function processCronJob(
     leaderboardQueue.add(
       'leaderboard',
       { type: 'SYNC_USER', userId: user.id },
-      { jobId: `sync:${user.id}:${currentLocalDate}` },
+      { jobId: `sync-${user.id}-${currentLocalDate}` },
     ).catch(console.error);
     jobsEnqueued++;
 
@@ -148,7 +148,7 @@ async function processCronJob(
     notificationsQueue.add(
       'notification',
       { type: 'DAILY_SUMMARY', userId: user.id },
-      { jobId: `summary:${user.id}:${currentLocalDate}` },
+      { jobId: `summary-${user.id}-${currentLocalDate}` },
     ).catch(console.error);
     jobsEnqueued++;
 
@@ -162,7 +162,7 @@ async function processCronJob(
       streakValidationQueue.add(
         'streak',
         { type: 'VALIDATE_STREAK', habitId: habit.id, userId: user.id },
-        { jobId: `validate:${habit.id}:${currentLocalDate}` },
+        { jobId: `validate-${habit.id}-${currentLocalDate}` },
       ).catch(console.error);
       jobsEnqueued++;
       habitsChecked++;

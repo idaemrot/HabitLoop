@@ -141,7 +141,7 @@ export default function HabitModal({
       <div
         className="fixed z-50 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2
                    w-full max-w-md bg-surface rounded-3xl shadow-panel
-                   border border-border animate-fade-up"
+                   border border-border animate-fade-up flex flex-col max-h-[90vh]"
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-border">
@@ -164,7 +164,7 @@ export default function HabitModal({
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4 overflow-y-auto">
           {/* Global error */}
           {error && (
             <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">
