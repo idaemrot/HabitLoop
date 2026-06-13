@@ -1,77 +1,145 @@
 # HabitLoop 🔥
 
-> A full-stack habit-tracking application built with React, Node.js, PostgreSQL, Redis, and real-time Socket.IO.
+> A full-stack habit-tracking application with real-time updates, social features, leaderboards, and background job processing — fully containerized with Docker.
+
+[![CI/CD Pipeline](https://github.com/idaemrot/HabitLoop/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/idaemrot/HabitLoop/actions/workflows/ci-cd.yml)
+
+---
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | React 18 + Vite + Tailwind CSS + React Router v6 |
-| Backend | Node.js 20 + Express + Prisma ORM |
-| Database | PostgreSQL 16 |
-| Cache / Queue | Redis 7 + BullMQ |
-| Real-time | Socket.IO |
-| Auth | JWT (jsonwebtoken) |
-| Containers | Docker + Docker Compose |
+| **Frontend** | React 18 + Vite + Tailwind CSS + React Router v6 |
+| **Backend** | Node.js 20 + Express + Prisma ORM + Zod |
+| **Database** | PostgreSQL 16 |
+| **Cache / Queue** | Redis 7 + BullMQ |
+| **Workers** | BullMQ (streak, notifications, leaderboard, cron) |
+| **Real-time** | Socket.IO |
+| **Auth** | JWT + httpOnly refresh token cookies |
+| **Containers** | Docker + Docker Compose |
+| **CI/CD** | GitHub Actions → GHCR |
+
+---
 
 ## Project Structure
 
 ```
 HabitLoop/
-├── frontend/          # React + Vite SPA
-├── backend/           # Express REST API + Socket.IO
-├── docker-compose.yml # Full-stack orchestration
+├── frontend/               # React + Vite SPA
+│   ├── src/
+│   │   ├── pages/          # Route-level components
+│   │   ├── components/     # Shared UI components
+│   │   ├── store/          # Auth context
+│   │   ├── hooks/          # Custom React hooks
+│   │   └── api/            # Axios client
+│   ├── Dockerfile          # Multi-stage: dev → build → nginx
+│   └── nginx.conf          # SPA fallback + /api proxy
+│
+├── backend/                # Express REST API + Socket.IO
+│   ├── src/
+│   │   ├── routes/         # Express routers
+│   │   ├── controllers/    # Request handlers
+│   │   ├── services/       # Business logic
+│   │   ├── middlewares/    # Auth, validation, error handling
+│   │   ├── jobs/           # BullMQ queues + workers
+│   │   ├── sockets/        # Socket.IO event handlers
+│   │   ├── config/         # DB, Redis, env config
+│   │   ├── index.ts        # API server entry point
+│   │   └── worker.ts       # Standalone worker entry point
+│   ├── prisma/             # Schema + migrations + seed
+│   ├── Dockerfile          # Multi-stage: deps → build → production
+│   └── worker.Dockerfile   # Dedicated worker image
+│
+├── .github/
+│   └── workflows/
+│       └── ci-cd.yml       # PR checks + main branch Docker builds
+│
+├── docker-compose.yml      # All 5 services orchestration
+├── .env.example            # Environment variable template
 └── README.md
 ```
 
-## Getting Started
+---
+
+## Services
+
+| Container | Image | Port | Description |
+|-----------|-------|------|-------------|
+| `postgres` | `postgres:16-alpine` | 5432 | Primary database with persistent volume |
+| `redis` | `redis:7-alpine` | 6379 | BullMQ job queue + session cache |
+| `backend` | `habitloop-backend` | 4000 | REST API + Socket.IO server |
+| `worker` | `habitloop-worker` | — | Background job processor (no HTTP) |
+| `frontend` | `habitloop-frontend` | 80 | React SPA served by Nginx |
+
+---
+
+## Quick Start (Docker — Recommended)
 
 ### Prerequisites
-- Node.js >= 20
-- Docker Desktop
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
 
-### 1. Clone & Install
-
-```bash
-# Install backend deps
-cd backend && npm install
-
-# Install frontend deps
-cd ../frontend && npm install
-```
-
-### 2. Environment Variables
+### 1. Clone & Configure
 
 ```bash
-# Backend
-cp backend/.env.example backend/.env
+git clone https://github.com/idaemrot/HabitLoop.git
+cd HabitLoop
 
-# Frontend
-cp frontend/.env.example frontend/.env
+cp .env.example .env
 ```
 
-Edit the `.env` files with your secrets before running.
-
-### 3. Run with Docker (Recommended)
+Edit `.env` — at minimum, set the two required secrets:
 
 ```bash
-docker compose up --build
+JWT_SECRET=<run: openssl rand -hex 32>
+JWT_REFRESH_SECRET=<run: openssl rand -hex 32>
 ```
 
-Services will be available at:
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:4000
-- PostgreSQL: localhost:5432
-- Redis: localhost:6379
+### 2. Start All Services
 
-### 4. Run without Docker (Development)
+```bash
+docker-compose up --build -d
+```
 
-Start PostgreSQL and Redis separately, then:
+### 3. Run Migrations & Seed
+
+```bash
+# Apply database schema
+docker-compose exec backend npx prisma migrate deploy
+
+# Seed with test users and habits
+docker-compose exec backend npx prisma db seed
+```
+
+### 4. Open the App
+
+| URL | Service |
+|-----|---------|
+| http://localhost | Frontend |
+| http://localhost/api/health | API health check |
+
+### Test Credentials (from seed)
+
+| User | Email | Password |
+|------|-------|----------|
+| Alice | alice@habitloop.dev | Password1! |
+| Bob | bob@habitloop.dev | Password1! |
+| Carol | carol@habitloop.dev | Password1! |
+
+> **Tip:** The login page pre-fills Carol's credentials for quick testing.
+
+---
+
+## Local Development (without Docker)
+
+Start PostgreSQL and Redis separately (or via `docker-compose up postgres redis -d`), then:
 
 ```bash
 # Terminal 1 — Backend
 cd backend
+cp .env.example .env   # Edit DATABASE_URL and REDIS_URL
 npx prisma db push
+npx prisma db seed
 npm run dev
 
 # Terminal 2 — Frontend
@@ -79,50 +147,81 @@ cd frontend
 npm run dev
 ```
 
-## API Health Check
+Dev URLs:
+- Frontend: http://localhost:5173
+- Backend: http://localhost:4000
 
-```bash
-curl http://localhost:4000/api/health
-```
-
-Expected response:
-```json
-{
-  "status": "ok",
-  "timestamp": "2024-01-01T00:00:00.000Z",
-  "services": {
-    "database": "connected",
-    "redis": "connected"
-  }
-}
-```
+---
 
 ## Scripts
 
 ### Backend
 | Command | Description |
 |---------|-------------|
-| `npm run dev` | Start dev server with hot-reload (tsx watch) |
-| `npm run build` | Compile TypeScript to `dist/` |
+| `npm run dev` | Dev server with hot-reload (tsx watch) |
+| `npm run build` | Compile TypeScript → `dist/` |
 | `npm start` | Run compiled production build |
 | `npm run lint` | Run ESLint |
-| `npm run format` | Run Prettier |
-| `npx prisma studio` | Open Prisma Studio GUI |
+| `npx prisma studio` | Open Prisma Studio DB browser |
+| `npx prisma migrate dev` | Create a new migration |
+| `npx prisma db seed` | Seed the database |
 
 ### Frontend
 | Command | Description |
 |---------|-------------|
 | `npm run dev` | Start Vite dev server |
-| `npm run build` | Production build |
-| `npm run preview` | Preview production build |
+| `npm run build` | Production build → `dist/` |
+| `npm run preview` | Preview production build locally |
 | `npm run lint` | Run ESLint |
-| `npm run format` | Run Prettier |
+
+---
+
+## Docker Commands
+
+```bash
+# View all container status
+docker-compose ps
+
+# Stream logs
+docker-compose logs -f
+
+# Restart a single service
+docker-compose restart worker
+
+# Rebuild and redeploy one service
+docker-compose up -d --build backend
+
+# Stop everything (keeps volumes)
+docker-compose down
+
+# Stop and wipe all data (destructive)
+docker-compose down -v
+```
+
+---
+
+## CI/CD Pipeline
+
+GitHub Actions runs automatically on every push and pull request.
+
+| Trigger | Jobs |
+|---------|------|
+| **Pull Request** | Install deps → Lint frontend → Lint backend → Run tests |
+| **Push to `main`** | Build frontend → Build backend → Build 3 Docker images → Push to GHCR |
+
+Docker images are published to the GitHub Container Registry:
+- `ghcr.io/<owner>/habitloop/habitloop-frontend:latest`
+- `ghcr.io/<owner>/habitloop/habitloop-backend:latest`
+- `ghcr.io/<owner>/habitloop/habitloop-worker:latest`
+
+---
 
 ## Architecture Decisions
 
-- **Prisma ORM** — type-safe DB access with migrations and studio GUI
-- **BullMQ + Redis** — reliable job queue for async tasks (streak calculation, notifications)
-- **Socket.IO** — real-time streak updates and live leaderboard
-- **JWT** — stateless auth; refresh tokens stored in Redis for revocation
-- **Zod** — runtime schema validation on all incoming requests
-- **Vite** — fast HMR dev experience with optimized production builds
+- **BullMQ + Redis** — Reliable async job queues for streak calculation, leaderboard recompute, and notifications. Worker runs as a standalone isolated container.
+- **Socket.IO** — Real-time streak updates and live leaderboard pushes to connected clients.
+- **Prisma ORM** — Type-safe database access with auto-generated migrations and a built-in studio GUI.
+- **JWT + httpOnly cookies** — Stateless access tokens (15m TTL) with secure refresh tokens in httpOnly cookies; token rotation on every refresh.
+- **Zod** — Runtime schema validation on all incoming API requests — no raw `req.body` usage.
+- **Multi-stage Dockerfiles** — Build artefacts are compiled in a `builder` stage; only the compiled output and production `node_modules` are copied to the final image, keeping image sizes minimal.
+- **Nginx SPA proxy** — Frontend Nginx config handles React Router fallback (`try_files`) and proxies all `/api/*` and `/socket.io/*` traffic to the backend container.
