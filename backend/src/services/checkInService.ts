@@ -118,6 +118,19 @@ export async function createCheckIn(
         },
       });
 
+      // Emit HABIT_CHECKED_IN activity — visible in friends' feeds
+      await tx.activity.create({
+        data: {
+          userId,
+          habitId,
+          activityType: 'HABIT_CHECKED_IN',
+          metadata: {
+            habitTitle:    habit.title,
+            completedDate: todayStr,
+          },
+        },
+      });
+
       // Emit activity for milestone streaks (7, 30, 100, 365 days)
       const milestones = [7, 30, 100, 365];
       if (milestones.includes(streakStats.currentStreak)) {
