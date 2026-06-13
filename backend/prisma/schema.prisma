@@ -1,0 +1,95 @@
+// ─── Prisma Schema ────────────────────────────────────────────────────────────
+// Run `npx prisma db push` to sync without migrations (dev)
+// Run `npx prisma migrate dev` to create a named migration
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+enum HabitFrequency {
+  DAILY
+  WEEKLY
+  CUSTOM
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  username     String   @unique
+  passwordHash String   @map("password_hash")
+  avatarUrl    String?  @map("avatar_url")
+  timezone     String   @default("UTC")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  habits       Habit[]
+  refreshTokens RefreshToken[]
+
+  @@map("users")
+}
+
+model Habit {
+  id          String         @id @default(uuid())
+  userId      String         @map("user_id")
+  name        String
+  description String?
+  frequency   HabitFrequency @default(DAILY)
+  targetDays  Int            @default(1)  @map("target_days")
+  color       String         @default("#6366f1")
+  icon        String         @default("flame")
+  isArchived  Boolean        @default(false) @map("is_archived")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  checkIns    CheckIn[]
+  streak      Streak?
+
+  @@map("habits")
+}
+
+model CheckIn {
+  id        String   @id @default(uuid())
+  habitId   String   @map("habit_id")
+  date      DateTime @db.Date
+  note      String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  habit     Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+
+  @@unique([habitId, date])
+  @@map("check_ins")
+}
+
+model Streak {
+  id           String   @id @default(uuid())
+  habitId      String   @unique @map("habit_id")
+  currentStreak Int     @default(0)  @map("current_streak")
+  longestStreak Int     @default(0)  @map("longest_streak")
+  lastCheckIn  DateTime? @map("last_check_in")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  habit        Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+
+  @@map("streaks")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}

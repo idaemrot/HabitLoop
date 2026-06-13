@@ -1,0 +1,214 @@
+/* ─── Fonts (must precede @tailwind) ─────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Design Tokens ──────────────────────────────────────────────────────── */
+:root {
+  --canvas:        #F5F5F3;
+  --ink:           #0F0F0F;
+  --muted:         #6B6B6B;
+  --border:        #E0E0E0;
+  --lime:          #D4FF4F;
+  --lime-hover:    #C4EF3F;
+  --purple:        #6C5CE7;
+  --sky:           #74C0FC;
+  --panel-bg:      #111118;
+  --panel-border:  rgba(255, 255, 255, 0.08);
+  --transition:    150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ─── Base Reset ─────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, sans-serif;
+  background-color: var(--canvas);
+  color: var(--ink);
+  min-height: 100vh;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+/* ─── Typography utilities ──────────────────────────────────────────────── */
+.display-xl {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  font-size: clamp(2.5rem, 6vw, 5rem);
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+.display-lg {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  font-size: clamp(2rem, 4vw, 3.5rem);
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+}
+.display-md {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 600;
+  font-size: clamp(1.5rem, 3vw, 2.25rem);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+.display-sm {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 600;
+  font-size: 1.25rem;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+}
+.label-upper {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ─── Component Layer ────────────────────────────────────────────────────── */
+@layer components {
+
+  /* ── Buttons ─────────────────────────────────────────────────────────── */
+  .btn-lime {
+    @apply inline-flex items-center gap-2 px-6 py-3 rounded-pill
+           text-sm font-semibold tracking-wide
+           bg-lime text-ink
+           transition-all duration-150 ease-in-out
+           hover:bg-lime-hover hover:shadow-lime
+           active:scale-95
+           disabled:opacity-40 disabled:cursor-not-allowed;
+    font-family: 'Space Grotesk', sans-serif;
+  }
+  .btn-dark {
+    @apply inline-flex items-center gap-2 px-6 py-3 rounded-pill
+           text-sm font-semibold tracking-wide
+           bg-ink text-white
+           transition-all duration-150 ease-in-out
+           hover:bg-opacity-80
+           active:scale-95
+           disabled:opacity-40 disabled:cursor-not-allowed;
+    font-family: 'Space Grotesk', sans-serif;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center gap-2 px-5 py-2.5 rounded-pill
+           text-sm font-medium
+           border border-border text-ink bg-transparent
+           transition-all duration-150 ease-in-out
+           hover:border-ink hover:bg-ink hover:text-white
+           active:scale-95;
+    font-family: 'Space Grotesk', sans-serif;
+  }
+
+  /* ── Cards ───────────────────────────────────────────────────────────── */
+  .card {
+    @apply bg-surface rounded-2xl border border-border
+           shadow-card transition-shadow duration-200
+           hover:shadow-card-hover;
+  }
+  .card-accent {
+    @apply rounded-2xl border-0 overflow-hidden relative;
+    background: linear-gradient(135deg, #6C5CE7 0%, #74C0FC 100%);
+    background-size: 32px 32px, 32px 32px, 100% 100%;
+  }
+  .card-accent::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px);
+    background-size: 32px 32px;
+    pointer-events: none;
+  }
+
+  /* ── Dark Panel (floating overlay mockup) ────────────────────────────── */
+  .panel-dark {
+    @apply rounded-2xl p-4;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+  }
+
+  /* ── Step Indicator ──────────────────────────────────────────────────── */
+  .step-pill {
+    @apply inline-flex items-center justify-center w-8 h-8 rounded-full
+           text-sm font-semibold
+           border border-border bg-surface text-muted
+           transition-all duration-200;
+    font-family: 'Space Grotesk', sans-serif;
+  }
+  .step-pill.active {
+    @apply bg-lime text-ink border-lime;
+  }
+
+  /* ── Section Divider ─────────────────────────────────────────────────── */
+  .divider { @apply w-full border-0 border-t border-border; }
+
+  /* ── Input ───────────────────────────────────────────────────────────── */
+  .input-field {
+    @apply w-full px-4 py-3 rounded-xl text-sm
+           bg-surface border border-border
+           text-ink placeholder-muted
+           transition-all duration-150
+           focus:outline-none focus:ring-2 focus:ring-lime/40 focus:border-lime-dark;
+    font-family: 'Inter', sans-serif;
+  }
+
+  /* ── Badge ───────────────────────────────────────────────────────────── */
+  .badge-lime {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-pill
+           text-xs font-semibold
+           bg-lime/20 text-ink border border-lime/40;
+    font-family: 'Space Grotesk', sans-serif;
+  }
+  .badge-dark {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-pill
+           text-xs font-medium
+           bg-ink/90 text-white;
+    font-family: 'Space Grotesk', sans-serif;
+  }
+
+  /* ── Navbar ──────────────────────────────────────────────────────────── */
+  .navbar {
+    @apply fixed top-0 left-0 right-0 z-50
+           flex items-center justify-between
+           px-6 py-4
+           bg-canvas/80 border-b border-border;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  /* ── Gradient text ───────────────────────────────────────────────────── */
+  .text-gradient {
+    background: linear-gradient(135deg, #6C5CE7 0%, #74C0FC 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .text-lime-accent { color: var(--lime); }
+}
+
+/* ─── Scrollbar ──────────────────────────────────────────────────────────── */
+::-webkit-scrollbar              { width: 6px; }
+::-webkit-scrollbar-track        { background: transparent; }
+::-webkit-scrollbar-thumb        { background: var(--border); border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover  { background: #C0C0C0; }
+
+/* ─── Animations ─────────────────────────────────────────────────────────── */
+.animate-delay-100 { animation-delay: 100ms; }
+.animate-delay-200 { animation-delay: 200ms; }
+.animate-delay-300 { animation-delay: 300ms; }
+.animate-delay-400 { animation-delay: 400ms; }
+.animate-delay-500 { animation-delay: 500ms; }
