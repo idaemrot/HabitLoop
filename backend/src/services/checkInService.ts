@@ -6,12 +6,13 @@ import {
   calculateStreaks,
   type StreakResult,
 } from '../lib/streak';
+import { cacheSet, cacheDel, CacheKey, TTL } from '../lib/cache';
 import type { HabitCheckIn, Streak } from '@prisma/client';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface CheckInResponse {
-  checkIn:  HabitCheckIn;
-  streak:   Streak;
+  checkIn:     HabitCheckIn;
+  streak:      Streak;
   streakStats: StreakResult;
 }
 
@@ -34,20 +35,25 @@ export interface HistoryResponse {
 // ─── POST /api/habits/:id/checkin ─────────────────────────────────────────────
 //
 // Flow:
-//  1. Verify habit belongs to the requesting user.
-//  2. Fetch user's timezone.
-//  3. Compute today's local date string → midnight UTC Date for DB storage.
-//  4. Attempt to create the check-in inside a transaction:
-//       a. Insert HabitCheckIn (DB unique constraint catches dupe silently).
-//       b. Fetch ALL check-in dates for streak recalculation.
-//       c. Run calculateStreaks().
-//       d. Update Streak record (upsert in case it was somehow missing).
+//  1. Verify habit belongs to the requesting user (+ fetch user timezone).
+//  2. Compute today's local date string → midnight UTC Date for DB storage.
+//  3. Attempt to create the check-in inside a transaction:
+//       a. INSERT HabitCheckIn — DB @@unique catches duplicates (→ P2002 → 409)
+//       b. SELECT all check-in dates for this habit (streak recalculation)
+//       c. Run calculateStreaks()
+//       d. UPSERT Streak record
+//       e. Emit STREAK_MILESTONE activity if applicable
+//  4. After the transaction commits, update Redis cache (best-effort):
+//       - WRITE  habit:{habitId}:streak  ← updated streak record
+//       - DEL    user:{userId}:streaks   ← stale user-level summary
+//       - DEL    user:{userId}:dashboard ← embedded streak data is now stale
 //  5. Return check-in + updated streak + stats.
 //
-// Idempotency note:
-//   If the user checks in twice on the same day the DB @@unique constraint
-//   throws a Prisma P2002 error. We catch it and return a 409 with a
-//   friendly message.
+// Cache strategy:
+//   The dashboard cache (user:{id}:dashboard) embeds streak data via Prisma
+//   include. When a check-in happens we invalidate it so the next GET /habits
+//   goes through to PostgreSQL and gets the fresh value. The habit-level streak
+//   cache is written immediately so GET /habits/:id/history gets a cache hit.
 // ─────────────────────────────────────────────────────────────────────────────
 export async function createCheckIn(
   habitId: string,
@@ -64,22 +70,24 @@ export async function createCheckIn(
   if (!user)  throw new AppError('User not found',  404);
 
   // 2. Compute today's calendar date in the user's timezone
-  const todayStr    = toLocalDateString(new Date(), user.timezone);
+  const todayStr      = toLocalDateString(new Date(), user.timezone);
   const completedDate = dateStringToUTC(todayStr);
 
+  // 3. Transaction
+  let result: CheckInResponse;
   try {
-    return await prisma.$transaction(async (tx) => {
-      // 3. Create check-in (throws P2002 on duplicate → caught below)
+    result = await prisma.$transaction(async (tx) => {
+      // INSERT — throws P2002 on duplicate → caught below
       const checkIn = await tx.habitCheckIn.create({
         data: {
           habitId,
-          userId,                // denormalised — always from JWT, never client body
-          completedDate,         // server-computed from user timezone
+          userId,          // denormalised — always from JWT, never client body
+          completedDate,   // server-computed from user timezone
           note: note ?? null,
         },
       });
 
-      // 4. Recalculate streaks from all existing check-ins
+      // Recalculate streaks from all existing check-ins
       const allDates = await tx.habitCheckIn.findMany({
         where:   { habitId },
         select:  { completedDate: true },
@@ -91,7 +99,7 @@ export async function createCheckIn(
         user.timezone,
       );
 
-      // 5. Upsert streak record
+      // Upsert streak record
       const streak = await tx.streak.upsert({
         where:  { habitId },
         create: {
@@ -103,16 +111,14 @@ export async function createCheckIn(
         },
         update: {
           currentStreak: streakStats.currentStreak,
-          longestStreak: Math.max(
-            // Never reduce longestStreak — preserve historical best
-            // (calculateStreaks already handles this, but explicit is safer)
-            streakStats.longestStreak,
-          ),
-          lastCheckIn: streakStats.lastCheckIn,
+          // calculateStreaks() already preserves historical maximum —
+          // assigning directly is correct.
+          longestStreak: streakStats.longestStreak,
+          lastCheckIn:   streakStats.lastCheckIn,
         },
       });
 
-      // 6. Emit activity for milestone streaks (7, 30, 100, 365 days)
+      // Emit activity for milestone streaks (7, 30, 100, 365 days)
       const milestones = [7, 30, 100, 365];
       if (milestones.includes(streakStats.currentStreak)) {
         await tx.activity.create({
@@ -121,8 +127,8 @@ export async function createCheckIn(
             habitId,
             activityType: 'STREAK_MILESTONE',
             metadata: {
-              milestone:    streakStats.currentStreak,
-              habitTitle:   habit.title,
+              milestone:  streakStats.currentStreak,
+              habitTitle: habit.title,
             },
           },
         });
@@ -138,13 +144,24 @@ export async function createCheckIn(
     }
     throw err;
   }
+
+  // 4. Cache — best-effort, outside transaction so we never cache uncommitted data.
+  //    DEL is awaited so no subsequent GET can serve stale data in the response gap.
+  //    cacheSet is fire-and-forget — a missed write causes one extra DB read, not corruption.
+  await cacheDel(
+    CacheKey.streaks(userId),
+    CacheKey.dashboard(userId, false),
+    CacheKey.dashboard(userId, true),
+  );
+  void cacheSet(CacheKey.habitStreak(result.checkIn.habitId), result.streak, TTL.HABIT_STREAK);
+
+  return result;
 }
 
 // ─── GET /api/habits/:id/history ─────────────────────────────────────────────
 //
 // Returns paginated check-ins with aggregate stats.
 // Streak stats come from the pre-computed Streak record (fast O(1) read).
-// Pagination is cursor-based on createdAt DESC (newest first).
 // ─────────────────────────────────────────────────────────────────────────────
 export async function getHabitHistory(
   habitId:  string,
@@ -189,6 +206,13 @@ export async function getHabitHistory(
 // ─── DELETE /api/habits/:id/checkin/today ─────────────────────────────────────
 // Undo today's check-in (within the same calendar day in user's timezone only).
 // Recalculates streak after removal.
+//
+// Cache strategy:
+//   After the transaction commits, invalidate all affected cache keys:
+//   - habit:{habitId}:streak   ← per-habit streak is now stale
+//   - user:{userId}:streaks    ← user-level summary is stale
+//   - user:{userId}:dashboard  ← embedded streak in habit list is stale
+// ─────────────────────────────────────────────────────────────────────────────
 export async function undoTodayCheckIn(
   habitId: string,
   userId:  string,
@@ -204,8 +228,8 @@ export async function undoTodayCheckIn(
   const todayStr      = toLocalDateString(new Date(), user.timezone);
   const completedDate = dateStringToUTC(todayStr);
 
-  return prisma.$transaction(async (tx) => {
-    // Delete today's check-in (throws if not found)
+  const result = await prisma.$transaction(async (tx) => {
+    // Delete today's check-in
     const deleted = await tx.habitCheckIn.deleteMany({
       where: { habitId, completedDate },
     });
@@ -214,7 +238,7 @@ export async function undoTodayCheckIn(
       throw new AppError('No check-in found for today', 404);
     }
 
-    // Recalculate streaks
+    // Recalculate streaks from remaining check-ins
     const allDates = await tx.habitCheckIn.findMany({
       where:   { habitId },
       select:  { completedDate: true },
@@ -230,11 +254,22 @@ export async function undoTodayCheckIn(
       where: { habitId },
       data: {
         currentStreak: streakStats.currentStreak,
-        // Never reduce longestStreak when undoing a check-in
+        // longestStreak intentionally not reduced on undo (preserve historical best)
         lastCheckIn:   streakStats.lastCheckIn,
       },
     });
 
     return { streak };
   });
+
+  // Cache invalidation — await DEL before return to close the stale-serve race window.
+  // cacheSet not needed here (undo reduces streak; next GET will repopulate from DB).
+  await cacheDel(
+    CacheKey.habitStreak(habitId),
+    CacheKey.streaks(userId),
+    CacheKey.dashboard(userId, false),
+    CacheKey.dashboard(userId, true),
+  );
+
+  return result;
 }
