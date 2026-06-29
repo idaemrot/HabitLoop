@@ -41,7 +41,7 @@ export default function LandingPage(): JSX.Element {
       </section>
 
       {/* ── Feature Cards ──────────────────────────────────────────────────── */}
-      <section className="px-6 pb-32 max-w-6xl mx-auto">
+      <section id="features" className="px-6 pb-32 max-w-6xl mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="flex flex-col gap-4 animate-fade-up animate-delay-100">
             <div className="bg-white border border-border rounded-2xl p-6 shadow-sm flex-1 min-h-[220px] flex items-center justify-center relative overflow-hidden group">
