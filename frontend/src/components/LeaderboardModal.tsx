@@ -10,7 +10,7 @@ const MEDAL: Record<number, { emoji: string; bg: string; border: string; text: s
 };
 
 // ─── PeriodTab ────────────────────────────────────────────────────────────────
-function PeriodTab({ label, value, active, onClick }: {
+function PeriodTab({ label, value: _value, active, onClick }: {
   label: string; value: LeaderboardPeriod; active: boolean; onClick: () => void;
 }): JSX.Element {
   return (

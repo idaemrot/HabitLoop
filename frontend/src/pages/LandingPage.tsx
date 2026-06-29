@@ -1,11 +1,7 @@
 import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../store/authContext';
-import {
-  HabitChecklistMockup,
-  StreakProgressMockup,
-  StatsMockup,
-} from '../components/UIMockups';
+
 
 // ─── Marketing Landing Page ───────────────────────────────────────────────────
 export default function LandingPage(): JSX.Element {
