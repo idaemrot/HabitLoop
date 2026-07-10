@@ -86,7 +86,6 @@ playwright-report/
 .zed/
 
 # ─── Package Managers ────────────────────────────────────────
-package-lock.json
 yarn.lock
 pnpm-lock.yaml
 # Uncomment the one you use and ignore the others:
