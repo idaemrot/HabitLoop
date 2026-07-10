@@ -12,12 +12,7 @@ export default function LandingPage(): JSX.Element {
 
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
       <section className="pt-32 pb-20 px-6 max-w-6xl mx-auto">
-        <div className="flex justify-start mb-6 animate-fade-up">
-          <span className="badge-lime">
-            <span className="w-1.5 h-1.5 rounded-full bg-lime-dark inline-block" />
-            Now in beta — free forever
-          </span>
-        </div>
+
         <h1 className="display-xl text-left text-ink mb-6 animate-fade-up animate-delay-100 max-w-2xl">
           Build habits that{' '}
           <span className="relative inline-block mt-2">

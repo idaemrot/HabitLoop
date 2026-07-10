@@ -1,6 +1,8 @@
 # HabitLoop 🔥
 
-> A full-stack habit-tracking application with real-time updates, social features, leaderboards, and background job processing — fully containerized with Docker.
+> A full-stack habit-tracking application with real-time updates, social features, leaderboards, and background job processing.
+
+**🌍 Live Demo:** [https://habit-loop-ten.vercel.app](https://habit-loop-ten.vercel.app)
 
 [![CI/CD Pipeline](https://github.com/idaemrot/HabitLoop/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/idaemrot/HabitLoop/actions/workflows/ci-cd.yml)
 
@@ -8,17 +10,16 @@
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| **Frontend** | React 18 + Vite + Tailwind CSS + React Router v6 |
-| **Backend** | Node.js 20 + Express + Prisma ORM + Zod |
-| **Database** | PostgreSQL 16 |
-| **Cache / Queue** | Redis 7 + BullMQ |
-| **Workers** | BullMQ (streak, notifications, leaderboard, cron) |
-| **Real-time** | Socket.IO |
-| **Auth** | JWT + httpOnly refresh token cookies |
-| **Containers** | Docker + Docker Compose |
-| **CI/CD** | GitHub Actions → GHCR |
+| Layer | Technology | Hosting / Provider |
+|-------|-----------|--------------------|
+| **Frontend** | React 18 + Vite + Tailwind CSS + React Router v6 | [Vercel](https://vercel.com) |
+| **Backend** | Node.js 20 + Express + Prisma ORM + Zod | [Render](https://render.com) (Free Tier) |
+| **Database** | PostgreSQL 16 | [Neon Serverless](https://neon.tech) |
+| **Cache / Queue** | Redis 7 + BullMQ | [Upstash](https://upstash.com) |
+| **Workers** | BullMQ (streak, notifications, leaderboard, cron) | Runs in-process on Render |
+| **Real-time** | Socket.IO | Render |
+| **Auth** | JWT + httpOnly refresh token cookies | — |
+| **CI/CD** | GitHub Actions | GitHub |
 
 ---
 
@@ -130,20 +131,34 @@ docker-compose exec backend npx prisma db seed
 
 ---
 
-## Local Development (without Docker)
+## Local Development
 
-Start PostgreSQL and Redis separately (or via `docker-compose up postgres redis -d`), then:
-
+### 1. Database & Redis
+Since the app uses serverless providers, you can use your production databases for local development, or spin up local instances using Docker:
 ```bash
-# Terminal 1 — Backend
+docker-compose up postgres redis -d
+```
+
+### 2. Backend Setup
+```bash
 cd backend
-cp .env.example .env   # Edit DATABASE_URL and REDIS_URL
+cp .env.example .env
+# Edit .env and set your DATABASE_URL and REDIS_URL
+
+npm install
 npx prisma db push
 npx prisma db seed
 npm run dev
+```
 
-# Terminal 2 — Frontend
+### 3. Frontend Setup
+```bash
 cd frontend
+cp .env.example .env.local
+# Set VITE_API_URL=http://localhost:4000/api
+# Set VITE_SOCKET_URL=http://localhost:4000
+
+npm install
 npm run dev
 ```
 
