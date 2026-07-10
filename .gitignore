@@ -51,7 +51,7 @@ frontend/.vite/
 
 # ─── Prisma ──────────────────────────────────────────────────
 # Keep schema, ignore generated migrations in dev (commit them in prod)
-backend/prisma/migrations/
+# backend/prisma/migrations/
 !backend/prisma/schema.prisma
 
 # ─── Redis ───────────────────────────────────────────────────
