@@ -109,7 +109,7 @@ jobs:
         with:
           context: ./backend
           push: true
-          tags: ghcr.io/${{ github.repository }}/habitloop-backend:latest
+          tags: ghcr.io/idaemrot/habitloop/habitloop-backend:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -120,7 +120,7 @@ jobs:
           context: ./backend
           file: ./backend/worker.Dockerfile
           push: true
-          tags: ghcr.io/${{ github.repository }}/habitloop-worker:latest
+          tags: ghcr.io/idaemrot/habitloop/habitloop-worker:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -130,6 +130,6 @@ jobs:
         with:
           context: ./frontend
           push: true
-          tags: ghcr.io/${{ github.repository }}/habitloop-frontend:latest
+          tags: ghcr.io/idaemrot/habitloop/habitloop-frontend:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
