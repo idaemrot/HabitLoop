@@ -9,7 +9,7 @@ services:
     plan: free
     rootDir: backend
     buildCommand: npm install --include=dev && npm run build && npx prisma generate
-    startCommand: npx prisma migrate deploy && node dist/index.js
+    startCommand: npx prisma migrate resolve --applied 20240101000000_init 2>/dev/null || true && npx prisma migrate deploy && npx prisma db seed && node dist/index.js
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
