@@ -39,7 +39,7 @@ let io: SocketIOServer | null = null;
 export function initializeSocket(httpServer: HttpServer): SocketIOServer {
   io = new SocketIOServer(httpServer, {
     cors: {
-      origin:      env.CORS_ORIGIN,
+      origin:      env.CORS_ORIGIN.split(',').map((o) => o.trim()),
       methods:     ['GET', 'POST'],
       credentials: true,
     },
