@@ -8,7 +8,7 @@ services:
     region: oregon
     plan: free
     rootDir: backend
-    buildCommand: npm install && npm run build && npx prisma generate
+    buildCommand: npm install --include=dev && npm run build && npx prisma generate
     startCommand: npx prisma migrate deploy && node dist/index.js
     healthCheckPath: /api/health
     envVars:
