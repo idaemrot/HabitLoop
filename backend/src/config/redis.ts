@@ -2,14 +2,19 @@ import Redis from 'ioredis';
 import { env } from './env';
 
 // ─── Redis Client Singleton ──────────────────────────────────────────────────
+// Supports both local redis:// and Upstash rediss:// (TLS) URLs.
+// ioredis requires tls:{} to be set explicitly when using the rediss:// scheme.
 let redisClient: Redis | null = null;
 
 export function getRedisClient(): Redis {
   if (!redisClient) {
+    const isTLS = env.REDIS_URL.startsWith('rediss://');
+
     redisClient = new Redis(env.REDIS_URL, {
       maxRetriesPerRequest: null, // Required by BullMQ
       enableReadyCheck: true,
       lazyConnect: true,
+      ...(isTLS && { tls: {} }), // Required for Upstash TLS connections
     });
 
     redisClient.on('connect', () => console.info('✅ Redis connected'));

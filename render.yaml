@@ -1,0 +1,59 @@
+services:
+  # ── Backend API (Express + Socket.IO) ─────────────────────────────────────────
+  - type: web
+    name: habitloop-backend
+    runtime: node
+    region: oregon          # free tier region
+    plan: free
+    rootDir: backend
+    buildCommand: npm install && npm run build && npx prisma generate
+    startCommand: npx prisma migrate deploy && node dist/index.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false          # set manually → Neon connection string
+      - key: REDIS_URL
+        sync: false          # set manually → Upstash TLS URL (rediss://...)
+      - key: JWT_SECRET
+        generateValue: true  # Render auto-generates a strong random value
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 15m
+      - key: JWT_REFRESH_EXPIRES_IN
+        value: 7d
+      - key: CORS_ORIGIN
+        sync: false          # set manually → your Vercel frontend URL
+      - key: RATE_LIMIT_WINDOW_MS
+        value: "900000"
+      - key: RATE_LIMIT_MAX
+        value: "1000"
+
+  # ── BullMQ Background Worker (no HTTP) ────────────────────────────────────────
+  - type: worker
+    name: habitloop-worker
+    runtime: node
+    region: oregon
+    plan: free
+    rootDir: backend
+    buildCommand: npm install && npm run build && npx prisma generate
+    startCommand: node dist/worker.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false          # same Neon connection string as the web service
+      - key: REDIS_URL
+        sync: false          # same Upstash URL as the web service
+      - key: JWT_SECRET
+        fromService:
+          type: web
+          name: habitloop-backend
+          envVarKey: JWT_SECRET
+      - key: JWT_REFRESH_SECRET
+        fromService:
+          type: web
+          name: habitloop-backend
+          envVarKey: JWT_REFRESH_SECRET
