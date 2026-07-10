@@ -6,32 +6,32 @@ import { HabitChecklistMockup } from '../components/UIMockups';
 // ─── Password strength helper ──────────────────────────────────────────────────
 function getPasswordStrength(pw: string): { score: number; label: string; color: string } {
   let score = 0;
-  if (pw.length >= 8)        score++;
-  if (/[A-Z]/.test(pw))     score++;
-  if (/[a-z]/.test(pw))     score++;
-  if (/[0-9]/.test(pw))     score++;
+  if (pw.length >= 8) score++;
+  if (/[A-Z]/.test(pw)) score++;
+  if (/[a-z]/.test(pw)) score++;
+  if (/[0-9]/.test(pw)) score++;
   if (/[^A-Za-z0-9]/.test(pw)) score++;
 
-  if (score <= 1) return { score, label: 'Weak',   color: '#ef4444' };
-  if (score <= 2) return { score, label: 'Fair',   color: '#f59e0b' };
-  if (score <= 3) return { score, label: 'Good',   color: '#74C0FC' };
-  return              { score, label: 'Strong', color: '#D4FF4F' };
+  if (score <= 1) return { score, label: 'Weak', color: '#ef4444' };
+  if (score <= 2) return { score, label: 'Fair', color: '#f59e0b' };
+  if (score <= 3) return { score, label: 'Good', color: '#74C0FC' };
+  return { score, label: 'Strong', color: '#D4FF4F' };
 }
 
 // ─── Register Page ────────────────────────────────────────────────────────────
 export default function RegisterPage(): JSX.Element {
   const { register, user, isLoading } = useAuth();
-  const navigate     = useNavigate();
+  const navigate = useNavigate();
 
   if (!isLoading && user) {
     return <Navigate to="/dashboard" replace />;
   }
 
   const [username, setUsername] = useState('');
-  const [email,    setEmail]    = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading,  setLoading]  = useState(false);
-  const [error,    setError]    = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const strength = getPasswordStrength(password);
@@ -239,8 +239,8 @@ export default function RegisterPage(): JSX.Element {
             {loading ? (
               <span className="inline-flex items-center gap-2">
                 <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
                 Creating account…
               </span>
@@ -249,13 +249,6 @@ export default function RegisterPage(): JSX.Element {
             )}
           </button>
         </form>
-
-        <p className="text-[11px] text-muted text-center mt-6 leading-relaxed">
-          By signing up, you agree to our{' '}
-          <a href="#" className="underline hover:text-ink">Terms</a>{' '}
-          and{' '}
-          <a href="#" className="underline hover:text-ink">Privacy Policy</a>.
-        </p>
       </div>
     </div>
   );

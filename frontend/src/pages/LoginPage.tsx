@@ -13,7 +13,7 @@ export default function LoginPage(): JSX.Element {
     return <Navigate to="/dashboard" replace />;
   }
 
-  const [email, setEmail] = useState('carol@habitloop.dev');
+  const [email, setEmail] = useState('manish@habitloop.dev');
   const [password, setPassword] = useState('Password1!');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -164,13 +164,6 @@ export default function LoginPage(): JSX.Element {
             )}
           </button>
         </form>
-
-        <p className="text-[11px] text-muted text-center mt-6 leading-relaxed">
-          By signing in, you agree to our{' '}
-          <a href="#" className="underline hover:text-ink">Terms</a>{' '}
-          and{' '}
-          <a href="#" className="underline hover:text-ink">Privacy Policy</a>.
-        </p>
       </div>
 
       {/* ── Right — Accent panel ─────────────────────────────────────────── */}

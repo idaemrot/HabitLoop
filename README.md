@@ -123,11 +123,10 @@ docker-compose exec backend npx prisma db seed
 
 | User | Email | Password |
 |------|-------|----------|
-| Alice | alice@habitloop.dev | Password1! |
-| Bob | bob@habitloop.dev | Password1! |
-| Carol | carol@habitloop.dev | Password1! |
+| Manish | manish@habitloop.dev | Password1! |
+| Veena | veena@habitloop.dev | Password1! |
 
-> **Tip:** The login page pre-fills Carol's credentials for quick testing.
+> **Tip:** The login page pre-fills Manish's credentials for quick testing.
 
 ---
 
