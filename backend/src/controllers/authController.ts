@@ -14,7 +14,7 @@ const REFRESH_COOKIE = 'hl_refresh';
 const COOKIE_OPTIONS = {
   httpOnly: true,
   secure:   process.env.NODE_ENV === 'production',  // HTTPS only in prod
-  sameSite: 'strict' as const,
+  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
   maxAge:   30 * 24 * 60 * 60 * 1000,              // 30 days in ms
   path:     '/api/auth',                             // scoped — only sent to auth endpoints
 } as const;
