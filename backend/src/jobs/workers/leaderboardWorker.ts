@@ -25,14 +25,22 @@
 //   takes over. This is what actually eliminates the silent point-loss the
 //   BullMQ migration was meant to fix.
 //
+// Idempotency:
+//   ADD_SCORE / REMOVE_SCORE use applyCheckInScoreIdempotent /
+//   undoCheckInScoreIdempotent, which claim the job id AND apply the score
+//   mutation as a single atomic Redis Lua script — see that module for why
+//   the previous separate SETNX-then-mutate sequence had a crash window
+//   that could lose or double-apply points.
+//
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { Worker, type Job } from 'bullmq';
 import { getBullMQConnection } from '../../config/bullmq';
-import { getRedisClient } from '../../config/redis';
 import {
   applyCheckInScore,
   undoCheckInScore,
+  applyCheckInScoreIdempotent,
+  undoCheckInScoreIdempotent,
   syncLeaderboardFromDB,
 } from '../../services/leaderboardService';
 import {
@@ -66,21 +74,13 @@ export async function processLeaderboardJob(
     case 'ADD_SCORE': {
       const { userId, prevStreak, currentStreak } = job.data;
 
-      if (job.id) {
-        const redis = getRedisClient();
-        const idempotencyKey = `processed:leaderboard:add:${job.id}`;
-        const acquired = await redis.setnx(idempotencyKey, '1');
-        if (acquired === 0) {
-          console.info(`[LeaderboardWorker] ADD_SCORE skipped (already processed): ${job.id}`);
-          return { userId, delta: 0, operation: 'ADD_SCORE' };
-        }
-        // Keep the processed key for 30 days
-        await redis.expire(idempotencyKey, 2592000);
-      }
-
-      // applyCheckInScore throws on Redis failure — left unhandled here on
-      // purpose so BullMQ's retry mechanism kicks in.
-      const delta = await applyCheckInScore(userId, currentStreak, prevStreak);
+      // Claim + mutate atomically when we have a job id to key the claim on
+      // (BullMQ always assigns one; the fallback below is defensive only).
+      // Throws on Redis failure — left unhandled here on purpose so
+      // BullMQ's retry mechanism kicks in.
+      const delta = job.id
+        ? await applyCheckInScoreIdempotent(job.id, userId, currentStreak, prevStreak)
+        : await applyCheckInScore(userId, currentStreak, prevStreak);
 
       if (delta > 0) {
         emitLeaderboardUpdated();
@@ -97,20 +97,10 @@ export async function processLeaderboardJob(
     case 'REMOVE_SCORE': {
       const { userId, streakBeforeUndo, streakAfterUndo } = job.data;
 
-      if (job.id) {
-        const redis = getRedisClient();
-        const idempotencyKey = `processed:leaderboard:remove:${job.id}`;
-        const acquired = await redis.setnx(idempotencyKey, '1');
-        if (acquired === 0) {
-          console.info(`[LeaderboardWorker] REMOVE_SCORE skipped (already processed): ${job.id}`);
-          return { userId, delta: 0, operation: 'REMOVE_SCORE' };
-        }
-        // Keep the processed key for 30 days
-        await redis.expire(idempotencyKey, 2592000);
-      }
-
-      // undoCheckInScore likewise throws on Redis failure — same reasoning.
-      const delta = await undoCheckInScore(userId, streakBeforeUndo, streakAfterUndo);
+      // Same atomic claim+mutate approach as ADD_SCORE above.
+      const delta = job.id
+        ? await undoCheckInScoreIdempotent(job.id, userId, streakBeforeUndo, streakAfterUndo)
+        : await undoCheckInScore(userId, streakBeforeUndo, streakAfterUndo);
 
       if (delta > 0) {
         emitLeaderboardUpdated();

@@ -170,6 +170,174 @@ export async function applyCheckInScore(
   return delta;
 }
 
+// ─── Idempotent atomic mutations (used only by the BullMQ worker) ────────────
+//
+// bug #5: previously the worker did SETNX(processedKey) to "claim" a job,
+// THEN separately called applyCheckInScore/undoCheckInScore to mutate the
+// sorted sets. If the worker process crashed between those two steps, a
+// BullMQ retry would see the claim already set and skip the mutation
+// forever — permanent, silent point loss. Moving the claim to AFTER the
+// mutation instead would trade that for the opposite bug: a crash between
+// mutating and claiming would cause a retry to redo the mutation, double-
+// counting points.
+//
+// The fix is to make "claim" and "mutate" a single atomic operation, so
+// there is no window in which one happened without the other: a Lua script
+// runs to completion on the Redis server without interruption from any
+// other command (including another attempt at the same script), so the
+// EXISTS check and the ZINCRBYs it guards can never be observed or acted on
+// separately — by this worker, a retried job, or any concurrent client.
+// The only remaining failure mode is the Node process dying between
+// sending EVAL and reading its reply, in which case the mutation has
+// already been durably applied (and marked) on the Redis server — a retry
+// then correctly sees "already applied" and is a no-op, so it neither loses
+// nor double-applies points.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const IDEMPOTENCY_TTL_SECONDS = 2_592_000; // 30 days — matches the prior SETNX key lifetime
+
+// KEYS[1]=processedKey KEYS[2]=alltimeKey KEYS[3]=weeklyKey KEYS[4]=monthlyKey
+// ARGV[1]=delta ARGV[2]=member ARGV[3]=processedTTL ARGV[4]=weeklyTTL ARGV[5]=monthlyTTL
+// Returns 1 if applied, 0 if this jobId was already processed (no-op).
+const APPLY_SCORE_LUA = `
+if redis.call('EXISTS', KEYS[1]) == 1 then
+  return 0
+end
+redis.call('SET', KEYS[1], '1', 'EX', ARGV[3])
+redis.call('ZINCRBY', KEYS[2], ARGV[1], ARGV[2])
+redis.call('ZINCRBY', KEYS[3], ARGV[1], ARGV[2])
+redis.call('EXPIRE', KEYS[3], ARGV[4])
+redis.call('ZINCRBY', KEYS[4], ARGV[1], ARGV[2])
+redis.call('EXPIRE', KEYS[4], ARGV[5])
+return 1
+`;
+
+// Same shape as APPLY_SCORE_LUA but without the weekly/monthly TTL refresh
+// (undo never needs to extend a board's expiry) and returns the post-
+// mutation scores so the caller can run its existing best-effort clamp.
+// KEYS[1]=processedKey KEYS[2]=alltimeKey KEYS[3]=weeklyKey KEYS[4]=monthlyKey
+// ARGV[1]=negative delta ARGV[2]=member ARGV[3]=processedTTL
+// Returns {0} if already processed, or {1, alltime, weekly, monthly} if applied.
+const UNDO_SCORE_LUA = `
+if redis.call('EXISTS', KEYS[1]) == 1 then
+  return {0}
+end
+redis.call('SET', KEYS[1], '1', 'EX', ARGV[3])
+local alltime = redis.call('ZINCRBY', KEYS[2], ARGV[1], ARGV[2])
+local weekly = redis.call('ZINCRBY', KEYS[3], ARGV[1], ARGV[2])
+local monthly = redis.call('ZINCRBY', KEYS[4], ARGV[1], ARGV[2])
+return {1, alltime, weekly, monthly}
+`;
+
+/**
+ * Idempotent, crash-safe version of applyCheckInScore for BullMQ's ADD_SCORE
+ * job. `jobId` is BullMQ's own job id (already used as the queue-level
+ * dedup key for retries of the SAME attempt — see checkInService's
+ * `jobId: checkin-${checkInId}`) and doubles here as the Redis-level claim.
+ *
+ * THROWS on any Redis failure, same contract as applyCheckInScore — if EVAL
+ * itself fails, neither the claim nor the mutation happened, so a retry
+ * starts clean.
+ */
+export async function applyCheckInScoreIdempotent(
+  jobId:         string,
+  userId:        string,
+  currentStreak: number,
+  prevStreak     = 0,
+): Promise<number> {
+  let delta = BASE_SCORE;
+  if (prevStreak < 7 && currentStreak >= 7) delta += MILESTONE_7_BONUS;
+  if (prevStreak < 30 && currentStreak >= 30) delta += MILESTONE_30_BONUS;
+
+  const redis   = getRedisClient();
+  const applied = await redis.eval(
+    APPLY_SCORE_LUA,
+    4,
+    `processed:leaderboard:add:${jobId}`,
+    LEADERBOARD_KEY.alltime,
+    LEADERBOARD_KEY.weekly,
+    LEADERBOARD_KEY.monthly,
+    delta,
+    userId,
+    IDEMPOTENCY_TTL_SECONDS,
+    secondsUntilEndOfWeek(),
+    secondsUntilEndOfMonth(),
+  ) as number;
+
+  if (applied === 0) {
+    console.info(`[Leaderboard] ADD_SCORE skipped — job ${jobId} already applied`);
+    return 0;
+  }
+
+  console.info(
+    `[Leaderboard] +${delta} for user ${userId} (job:${jobId}, ` +
+    `streak: ${prevStreak}→${currentStreak})`,
+  );
+  return delta;
+}
+
+/**
+ * Idempotent, crash-safe version of undoCheckInScore for BullMQ's
+ * REMOVE_SCORE job. See applyCheckInScoreIdempotent's doc comment for the
+ * atomicity rationale; throws under the same conditions.
+ */
+export async function undoCheckInScoreIdempotent(
+  jobId:            string,
+  userId:           string,
+  streakBeforeUndo: number,
+  streakAfterUndo:  number,
+): Promise<number> {
+  let delta = BASE_SCORE;
+  if (streakAfterUndo < 7  && streakBeforeUndo >= 7)  delta += MILESTONE_7_BONUS;
+  if (streakAfterUndo < 30 && streakBeforeUndo >= 30) delta += MILESTONE_30_BONUS;
+
+  const redis  = getRedisClient();
+  const result = await redis.eval(
+    UNDO_SCORE_LUA,
+    4,
+    `processed:leaderboard:remove:${jobId}`,
+    LEADERBOARD_KEY.alltime,
+    LEADERBOARD_KEY.weekly,
+    LEADERBOARD_KEY.monthly,
+    -delta,
+    userId,
+    IDEMPOTENCY_TTL_SECONDS,
+  ) as [applied: number, alltime?: string, weekly?: string, monthly?: string];
+
+  const [applied, alltimeScore, weeklyScore, monthlyScore] = result;
+
+  if (applied === 0) {
+    console.info(`[Leaderboard] REMOVE_SCORE skipped — job ${jobId} already applied`);
+    return 0;
+  }
+
+  // Clamp any board that went negative → 0. Best-effort and non-atomic —
+  // same tradeoff the pre-existing code documented ("a brief negative value
+  // is cosmetic") — but idempotency-safe on its own: re-clamping an
+  // already-zeroed score is a no-op, so this being skipped or re-run by a
+  // retry can't lose or double-apply points either way.
+  const scoredKeys: Array<[string, string | undefined]> = [
+    [LEADERBOARD_KEY.alltime, alltimeScore],
+    [LEADERBOARD_KEY.weekly,  weeklyScore],
+    [LEADERBOARD_KEY.monthly, monthlyScore],
+  ];
+  const clampPipeline = redis.pipeline();
+  let needsClamp = false;
+  for (const [key, score] of scoredKeys) {
+    if (score !== undefined && parseFloat(score) < 0) {
+      clampPipeline.zadd(key, 0, userId);
+      needsClamp = true;
+    }
+  }
+  if (needsClamp) await clampPipeline.exec();
+
+  console.info(
+    `[Leaderboard] -${delta} for user ${userId} (job:${jobId}, ` +
+    `undo: streak ${streakBeforeUndo}→${streakAfterUndo})`,
+  );
+  return delta;
+}
+
 // ─── LeaderboardEntry type ────────────────────────────────────────────────────
 export interface LeaderboardEntry {
   rank:     number;           // 1-indexed
