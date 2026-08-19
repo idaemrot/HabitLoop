@@ -39,6 +39,10 @@ function StreakRing({ current, longest }: { current: number; longest: number }):
 // ─── HabitCard ────────────────────────────────────────────────────────────────
 interface HabitCardProps {
   habit:         Habit;
+  // Today's date (YYYY-MM-DD) in the user's own timezone — computed once by
+  // the parent (see DashboardPage) so it agrees with how the backend decides
+  // "today" for this user, rather than each card guessing from browser UTC.
+  today:         string;
   onEdit:        (habit: Habit) => void;
   onDelete:      (id: string) => Promise<void>;
   onArchive:     (id: string, archived: boolean) => Promise<void>;
@@ -51,6 +55,7 @@ interface HabitCardProps {
 
 export default function HabitCard({
   habit,
+  today,
   onEdit,
   onDelete,
   onArchive,
@@ -64,7 +69,6 @@ export default function HabitCard({
   const lastCheckIn = streak?.lastCheckIn;
 
   // Check if checked in today (compare YYYY-MM-DD prefix of ISO string)
-  const today        = new Date().toISOString().split('T')[0];
   const checkedToday = lastCheckIn
     ? (typeof lastCheckIn === 'string' ? lastCheckIn : (lastCheckIn as Date).toISOString()).startsWith(today)
     : false;

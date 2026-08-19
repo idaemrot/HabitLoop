@@ -8,6 +8,7 @@ import FriendFeed from '../components/FriendFeed';
 import FriendsModal from '../components/FriendsModal';
 import LeaderboardModal from '../components/LeaderboardModal';
 import Toast from '../components/Toast';
+import { toLocalDateString } from '../lib/date';
 import type { Habit } from '../types';
 
 // ─── Empty state ──────────────────────────────────────────────────────────────
@@ -31,11 +32,13 @@ function EmptyState({ onAdd }: { onAdd: () => void }): JSX.Element {
 }
 
 // ─── Stats bar ────────────────────────────────────────────────────────────────
-function StatsBar({ habits }: { habits: Habit[] }): JSX.Element {
+// `today` is computed once by the caller (in the user's own timezone — see
+// DashboardPage) and passed in, rather than each user of "today" deriving
+// its own UTC-based guess.
+function StatsBar({ habits, today }: { habits: Habit[]; today: string }): JSX.Element {
   const total       = habits.length;
   const totalStreak = habits.reduce((s, h) => s + (h.streak?.currentStreak ?? 0), 0);
   const best        = Math.max(0, ...habits.map((h) => h.streak?.longestStreak ?? 0));
-  const today       = new Date().toISOString().split('T')[0];
   const doneToday   = habits.filter((h) => h.streak?.lastCheckIn?.startsWith(today)).length;
 
   const stats = [
@@ -90,6 +93,15 @@ export default function DashboardPage(): JSX.Element {
 
   const activeHabits   = habits.filter((h) => !h.isArchived);
   const archivedHabits = habits.filter((h) =>  h.isArchived);
+
+  // "Today" in the user's own configured timezone (falls back to the
+  // browser's timezone only in the unlikely case `user` isn't loaded yet).
+  // Computed once here so every "checked in today" comparison on this page
+  // agrees with the backend, which always reasons in the user's timezone.
+  const today = toLocalDateString(
+    new Date(),
+    user?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
+  );
 
   return (
     <div className="min-h-screen bg-canvas">
@@ -146,7 +158,7 @@ export default function DashboardPage(): JSX.Element {
         </div>
 
         {/* Stats */}
-        {activeHabits.length > 0 && <StatsBar habits={activeHabits} />}
+        {activeHabits.length > 0 && <StatsBar habits={activeHabits} today={today} />}
 
         {/* Error state */}
         {error && (
@@ -184,6 +196,7 @@ export default function DashboardPage(): JSX.Element {
                         <div key={h.id} className="animate-fade-up">
                           <HabitCard
                             habit={h}
+                            today={today}
                             onEdit={openEdit}
                             onDelete={deleteHabit}
                             onArchive={archiveHabit}
@@ -215,6 +228,7 @@ export default function DashboardPage(): JSX.Element {
                           <HabitCard
                             key={h.id}
                             habit={h}
+                            today={today}
                             onEdit={openEdit}
                             onDelete={deleteHabit}
                             onArchive={archiveHabit}
