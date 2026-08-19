@@ -59,6 +59,7 @@ async function main(): Promise<void> {
     where: { id: 'seed-manish-habit-1' },
     update: {},
     create: {
+      id: 'seed-manish-habit-1',
       userId: manish.id,
       title: 'Read 20 pages',
       description: 'Before bed',
@@ -66,14 +67,13 @@ async function main(): Promise<void> {
       color: '#4D96FF',
       icon: '📚',
     },
-  }).catch(() => prisma.habit.create({
-    data: { userId: manish.id, title: 'Read 20 pages', frequency: HabitFrequency.DAILY, color: '#4D96FF', icon: '📚' }
-  }));
+  });
 
   const veenaHabit = await prisma.habit.upsert({
     where: { id: 'seed-veena-habit-1' },
     update: {},
     create: {
+      id: 'seed-veena-habit-1',
       userId: veena.id,
       title: 'Morning Walk',
       description: '15 mins outside',
@@ -81,9 +81,7 @@ async function main(): Promise<void> {
       color: '#F4D160',
       icon: '🚶‍♀️',
     },
-  }).catch(() => prisma.habit.create({
-    data: { userId: veena.id, title: 'Morning Walk', frequency: HabitFrequency.DAILY, color: '#F4D160', icon: '🚶‍♀️' }
-  }));
+  });
 
   // 4. Check-ins & Streaks
   console.info('✅ Creating check-ins & streaks…');
@@ -109,15 +107,26 @@ async function main(): Promise<void> {
   });
 
   // 6. Minimal Feed Activity
+  // Upserted individually by a deterministic `id` (the real primary-key unique
+  // constraint) rather than `createMany({ skipDuplicates: true })` — Activity
+  // has no @@unique constraint on its content columns, so skipDuplicates would
+  // have nothing to deduplicate against and would insert fresh rows every run.
   console.info('📜 Creating activity log…');
-  await prisma.activity.createMany({
-    data: [
-      { userId: manish.id, habitId: manishHabit.id, activityType: ActivityType.HABIT_CREATED, metadata: { title: 'Read 20 pages' }, createdAt: daysAgo(2) },
-      { userId: manish.id, habitId: manishHabit.id, activityType: ActivityType.HABIT_CHECKED_IN, metadata: { streakCount: 1 }, createdAt: daysAgo(1) },
-      { userId: veena.id, habitId: veenaHabit.id, activityType: ActivityType.HABIT_CREATED, metadata: { title: 'Morning Walk' }, createdAt: daysAgo(1) },
-    ],
-    skipDuplicates: true,
-  });
+  const activities: Array<{
+    id: string; userId: string; habitId: string;
+    activityType: ActivityType; metadata: object; createdAt: Date;
+  }> = [
+    { id: 'seed-manish-activity-habit-created', userId: manish.id, habitId: manishHabit.id, activityType: ActivityType.HABIT_CREATED, metadata: { title: 'Read 20 pages' }, createdAt: daysAgo(2) },
+    { id: 'seed-manish-activity-checked-in',    userId: manish.id, habitId: manishHabit.id, activityType: ActivityType.HABIT_CHECKED_IN, metadata: { streakCount: 1 }, createdAt: daysAgo(1) },
+    { id: 'seed-veena-activity-habit-created',  userId: veena.id,  habitId: veenaHabit.id,  activityType: ActivityType.HABIT_CREATED, metadata: { title: 'Morning Walk' }, createdAt: daysAgo(1) },
+  ];
+  for (const a of activities) {
+    await prisma.activity.upsert({
+      where: { id: a.id },
+      update: {},
+      create: a,
+    });
+  }
 
   console.info('\n✨ Minimal Seed complete!\n');
   console.info('🔑 Test credentials (password: Password1!)');

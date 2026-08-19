@@ -9,7 +9,11 @@ services:
     plan: free
     rootDir: backend
     buildCommand: npm install --include=dev && npm run build && npx prisma generate
-    startCommand: npx prisma migrate resolve --applied 20240101000000_init 2>/dev/null || true && npx prisma migrate deploy && npx prisma db seed && node dist/index.js
+    # NOTE: seeding is intentionally NOT part of startCommand — Render re-runs
+    # startCommand on every wake from the free plan's sleep, so a seed step here
+    # would re-seed on every cold start. Seed demo data manually, once, via
+    # `npm run prisma:seed` (backend/prisma/seed.ts is idempotent — safe to re-run).
+    startCommand: npx prisma migrate resolve --applied 20240101000000_init 2>/dev/null || true && npx prisma migrate deploy && node dist/index.js
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
