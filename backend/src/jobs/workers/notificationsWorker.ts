@@ -21,7 +21,7 @@ import { Worker, type Job } from 'bullmq';
 import { getBullMQConnection }               from '../../config/bullmq';
 import { getIO }                             from '../../sockets';
 import { userRoom }                          from '../../sockets/connectionManager';
-import { SOCKET_EVENTS }                     from '../../sockets/events';
+import { SOCKET_EVENTS, type FriendCheckInEvent } from '../../sockets/events';
 import { prisma }                            from '../../config/database';
 import {
   QUEUE_NAMES,
@@ -30,23 +30,34 @@ import {
 } from '../types';
 
 // ─── Processor ───────────────────────────────────────────────────────────────
-async function processNotification(
+// Exported (not just used by the worker factory below) so it can be driven
+// directly from unit tests without spinning up a real BullMQ/Redis connection.
+export async function processNotification(
   job: Job<NotificationJobData, NotificationJobResult>,
 ): Promise<NotificationJobResult> {
   const { type } = job.data;
 
   switch (type) {
     case 'FRIEND_CHECKIN': {
-      const { toUserId, fromUserId, habitTitle, streak } = job.data;
+      const {
+        toUserId, activityId, userId, username, avatarUrl,
+        habitId, habitTitle, habitColor, habitIcon,
+        currentStreak, completedDate, createdAt,
+      } = job.data;
 
-      getIO().to(userRoom(toUserId)).emit(SOCKET_EVENTS.FRIEND_CHECKED_IN, {
-        userId:        fromUserId,
-        habitTitle,
-        currentStreak: streak,
-      });
+      // Built explicitly (not spread) so a future field added to
+      // FriendCheckInEvent without a matching producer update fails to
+      // compile here, instead of silently emitting an incomplete payload.
+      const event: FriendCheckInEvent = {
+        activityId, userId, username, avatarUrl,
+        habitId, habitTitle, habitColor, habitIcon,
+        currentStreak, completedDate, createdAt,
+      };
+
+      getIO().to(userRoom(toUserId)).emit(SOCKET_EVENTS.FRIEND_CHECKED_IN, event);
 
       console.info(
-        `[NotifWorker] FRIEND_CHECKIN → user:${toUserId} from:${fromUserId}`,
+        `[NotifWorker] FRIEND_CHECKIN → user:${toUserId} from:${userId}`,
       );
       return { delivered: true, channel: 'socket' };
     }

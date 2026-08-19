@@ -20,6 +20,8 @@ export interface CheckInResponse {
   streakStats: StreakResult;
   /** Streak value BEFORE this check-in. Used by leaderboard for milestone detection. */
   prevStreak:  number;
+  /** id of the HABIT_CHECKED_IN Activity row — used as the feed item id in the friend socket event. */
+  activityId:  string;
 }
 
 export interface HistoryResponse {
@@ -131,7 +133,7 @@ export async function createCheckIn(
       });
 
       // Emit HABIT_CHECKED_IN activity — visible in friends' feeds
-      await tx.activity.create({
+      const activity = await tx.activity.create({
         data: {
           userId,
           habitId,
@@ -159,7 +161,7 @@ export async function createCheckIn(
         });
       }
 
-      return { checkIn, streak, streakStats, prevStreak };
+      return { checkIn, streak, streakStats, prevStreak, activityId: activity.id };
     });
   } catch (err: unknown) {
     // Prisma unique constraint violation → duplicate check-in
@@ -182,7 +184,7 @@ export async function createCheckIn(
 
   // 5. Real-time fanout — fire-and-forget; socket failure must not fail the HTTP response.
   //    We do this AFTER cache invalidation so any friend's subsequent HTTP fetch gets fresh data.
-  void emitCheckInEvents(userId, habit, result);
+  void emitCheckInEvents(userId, habit, result, todayStr);
 
   // 6. Redis Leaderboard Update — fire-and-forget push to BullMQ.
   //    The worker handles Redis failures via automatic retry, eliminating
@@ -216,6 +218,7 @@ async function emitCheckInEvents(
   userId:    string,
   habit:     { id: string; title: string; color: string; icon: string },
   result:    CheckInResponse,
+  todayStr:  string,
 ): Promise<void> {
   try {
     const io = getIO();
@@ -240,14 +243,26 @@ async function emitCheckInEvents(
       f.requesterId === userId ? f.receiverId : f.requesterId,
     );
 
-    // Enqueue to BullMQ instead of emitting directly
+    // Enqueue to BullMQ instead of emitting directly.
+    // Payload carries the FULL FriendCheckInEvent shape (see jobs/types.ts) —
+    // the worker emits this object to the friend's socket room as-is, so every
+    // field the frontend's FriendCheckInPayload contract expects must be here.
+    const createdAt = new Date().toISOString();
     for (const friendId of friendIds) {
       notificationsQueue.add('friend_checkin', {
-        type:       'FRIEND_CHECKIN',
-        toUserId:   friendId,
-        fromUserId: userId,
-        habitTitle: habit.title,
-        streak:     result.streak.currentStreak,
+        type:          'FRIEND_CHECKIN',
+        toUserId:      friendId,
+        activityId:    result.activityId,
+        userId,                              // the friend who checked in
+        username:      user.username,
+        avatarUrl:     user.avatarUrl,
+        habitId:       habit.id,
+        habitTitle:    habit.title,
+        habitColor:    habit.color,
+        habitIcon:     habit.icon,
+        currentStreak: result.streak.currentStreak,
+        completedDate: todayStr,
+        createdAt,
       }).catch((err: unknown) => {
         console.error('[Queue] failed to enqueue FRIEND_CHECKIN:', (err as Error).message);
       });

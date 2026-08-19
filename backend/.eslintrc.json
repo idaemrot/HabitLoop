@@ -30,5 +30,11 @@
     "node": true,
     "es2022": true
   },
+  "overrides": [
+    {
+      "files": ["**/*.test.ts"],
+      "parserOptions": { "project": "./tsconfig.eslint.json" }
+    }
+  ],
   "ignorePatterns": ["dist/", "node_modules/", "*.js"]
 }

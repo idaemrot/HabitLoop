@@ -11,6 +11,8 @@
 //   Job result type   → XxxJobResult
 // ─────────────────────────────────────────────────────────────────────────────
 
+import type { FriendCheckInEvent } from '../sockets/events';
+
 // ─── Queue name registry ──────────────────────────────────────────────────────
 export const QUEUE_NAMES = {
   STREAK_VALIDATION:    'streak-validation',
@@ -48,15 +50,15 @@ export interface StreakValidationJobResult {
 // Jobs:
 //   FRIEND_CHECKIN  — notify a user that a friend has completed a habit.
 //   STREAK_MILESTONE — notify a user they hit a streak milestone.
+//
+// FRIEND_CHECKIN intersects with FriendCheckInEvent (the socket payload the
+// worker ultimately emits) plus the routing field `toUserId`. This is
+// deliberate: it makes it a COMPILE ERROR for a producer to enqueue a
+// FRIEND_CHECKIN job that doesn't carry every field the frontend's
+// FriendCheckInPayload contract requires (see frontend/src/sockets/events.ts).
 // ─────────────────────────────────────────────────────────────────────────────
 export type NotificationJobData =
-  | {
-      type:       'FRIEND_CHECKIN';
-      toUserId:   string;
-      fromUserId: string;
-      habitTitle: string;
-      streak:     number;
-    }
+  | ({ type: 'FRIEND_CHECKIN'; toUserId: string } & FriendCheckInEvent)
   | {
       type:      'STREAK_MILESTONE';
       toUserId:  string;
