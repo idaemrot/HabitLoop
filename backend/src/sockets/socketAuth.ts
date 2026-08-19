@@ -1,5 +1,6 @@
 import type { Socket } from 'socket.io';
 import { verifyAccessToken } from '../lib/jwt';
+import { isAccessTokenBlocklisted } from '../lib/tokenBlocklist';
 
 // ─── Socket.IO JWT Auth Middleware ───────────────────────────────────────────
 //
@@ -14,10 +15,10 @@ import { verifyAccessToken } from '../lib/jwt';
 //   token lives in memory (per spec — never in localStorage or cookies).
 //   The client must pass it explicitly in the auth object.
 // ─────────────────────────────────────────────────────────────────────────────
-export function socketAuthMiddleware(
+export async function socketAuthMiddleware(
   socket: Socket,
   next:   (err?: Error) => void,
-): void {
+): Promise<void> {
   const token = socket.handshake.auth?.token as string | undefined;
 
   if (!token) {
@@ -26,6 +27,11 @@ export function socketAuthMiddleware(
 
   try {
     const payload = verifyAccessToken(token);
+
+    if (payload.jti && (await isAccessTokenBlocklisted(payload.jti))) {
+      return next(new Error('Authentication required: invalid or expired token'));
+    }
+
     // Attach decoded identity to socket.data — available everywhere in server handlers
     socket.data.userId   = payload.sub;
     socket.data.username = payload.username;

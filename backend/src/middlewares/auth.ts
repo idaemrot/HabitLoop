@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import { verifyAccessToken, type AccessTokenPayload } from '../lib/jwt';
+import { isAccessTokenBlocklisted } from '../lib/tokenBlocklist';
 import { AppError } from './errorHandler';
 
 // ─── Augment Express Request ──────────────────────────────────────────────────
@@ -17,7 +18,7 @@ declare global {
 // Reads access token from Authorization: Bearer <token>
 // NEVER reads from cookies (refresh token only lives in httpOnly cookies)
 // NEVER reads from query params or body
-export function authenticate(req: Request, _res: Response, next: NextFunction): void {
+export async function authenticate(req: Request, _res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers.authorization;
 
   if (!authHeader?.startsWith('Bearer ')) {
@@ -28,6 +29,11 @@ export function authenticate(req: Request, _res: Response, next: NextFunction): 
 
   try {
     const payload = verifyAccessToken(token);
+
+    if (payload.jti && (await isAccessTokenBlocklisted(payload.jti))) {
+      return next(new AppError('Invalid or expired access token', 401));
+    }
+
     req.user = payload;
     next();
   } catch {
@@ -38,14 +44,17 @@ export function authenticate(req: Request, _res: Response, next: NextFunction): 
 // ─── optionalAuthenticate — attaches user if valid token present ──────────────
 // Usage:  router.get('/feed', optionalAuthenticate, handler)
 // Does not reject the request if no token — req.user will be undefined
-export function optionalAuthenticate(req: Request, _res: Response, next: NextFunction): void {
+export async function optionalAuthenticate(req: Request, _res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers.authorization;
 
   if (authHeader?.startsWith('Bearer ')) {
     const token = authHeader.slice(7);
     try {
       const payload = verifyAccessToken(token);
-      req.user = payload;
+      if (!payload.jti || !(await isAccessTokenBlocklisted(payload.jti))) {
+        req.user = payload;
+      }
+      // else: revoked token for optional auth — silently ignore, req.user stays undefined
     } catch {
       // Invalid token for optional auth — silently ignore, req.user stays undefined
     }

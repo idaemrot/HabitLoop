@@ -105,10 +105,10 @@ export async function logout(
 ): Promise<void> {
   try {
     const rawRefreshToken = req.cookies?.[REFRESH_COOKIE] as string | undefined;
+    const authHeader      = req.headers.authorization;
+    const rawAccessToken  = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
 
-    if (rawRefreshToken) {
-      await logoutUser(rawRefreshToken);
-    }
+    await logoutUser(rawRefreshToken, rawAccessToken);
 
     // Clear the cookie regardless of whether the token was valid
     res.clearCookie(REFRESH_COOKIE, { ...COOKIE_OPTIONS, maxAge: 0 });

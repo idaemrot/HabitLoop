@@ -3,10 +3,12 @@ import { prisma } from '../config/database';
 import { AppError } from '../middlewares/errorHandler';
 import {
   signAccessToken,
+  verifyAccessToken,
   generateRefreshToken,
   hashRefreshToken,
   refreshTokenExpiresAt,
 } from '../lib/jwt';
+import { blocklistAccessToken } from '../lib/tokenBlocklist';
 import type { RegisterInput, LoginInput } from '../validators/authValidators';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -154,10 +156,33 @@ export async function refreshAccessToken(
 }
 
 // ─── Logout ───────────────────────────────────────────────────────────────────
-export async function logoutUser(rawRefreshToken: string): Promise<void> {
-  const hashed = hashRefreshToken(rawRefreshToken);
-  // Delete the refresh token (ignore if already gone / invalid)
-  await prisma.refreshToken.deleteMany({ where: { token: hashed } });
+// Revokes BOTH tokens for this session:
+//   1. Refresh token  — deleted from the DB (already existed).
+//   2. Access token   — its jti is blocklisted in Redis until it would have
+//                        expired naturally (see lib/tokenBlocklist.ts). Without
+//                        this, a logged-out access token stayed valid for up
+//                        to its full 15-minute lifetime.
+// Either token being absent/invalid is not an error — logout always succeeds.
+export async function logoutUser(
+  rawRefreshToken?: string,
+  rawAccessToken?:  string,
+): Promise<void> {
+  if (rawRefreshToken) {
+    const hashed = hashRefreshToken(rawRefreshToken);
+    // Delete the refresh token (ignore if already gone / invalid)
+    await prisma.refreshToken.deleteMany({ where: { token: hashed } });
+  }
+
+  if (rawAccessToken) {
+    try {
+      const payload = verifyAccessToken(rawAccessToken);
+      if (payload.jti && payload.exp) {
+        await blocklistAccessToken(payload.jti, payload.exp);
+      }
+    } catch {
+      // Already invalid/expired/malformed — nothing to revoke.
+    }
+  }
 }
 
 // ─── Get Current User ─────────────────────────────────────────────────────────
