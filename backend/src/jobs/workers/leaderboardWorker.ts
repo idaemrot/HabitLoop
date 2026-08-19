@@ -17,9 +17,13 @@
 //                  Idempotent: safe to run repeatedly.
 //
 // Retry behaviour:
-//   All Redis errors propagate and trigger BullMQ exponential backoff.
-//   applyCheckInScore / undoCheckInScore are called WITHOUT their internal
-//   try/catch wrappers — we let errors surface to BullMQ here.
+//   applyCheckInScore / undoCheckInScore (leaderboardService.ts) throw on any
+//   Redis failure — connection-level or a per-command pipeline error. Neither
+//   is called from a fire-and-forget site anymore, so nothing here catches
+//   that: it propagates out of this processor, BullMQ marks the job failed,
+//   and its exponential-backoff retry (up to 5 attempts, see jobs/queues.ts)
+//   takes over. This is what actually eliminates the silent point-loss the
+//   BullMQ migration was meant to fix.
 //
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -51,7 +55,9 @@ function emitLeaderboardUpdated(): void {
 }
 
 // ─── Processor ───────────────────────────────────────────────────────────────
-async function processLeaderboardJob(
+// Exported so unit tests can drive it directly without a real BullMQ/Redis
+// connection.
+export async function processLeaderboardJob(
   job: Job<LeaderboardJobData, LeaderboardJobResult>,
 ): Promise<LeaderboardJobResult> {
   const { type } = job.data;
@@ -72,9 +78,9 @@ async function processLeaderboardJob(
         await redis.expire(idempotencyKey, 2592000);
       }
 
-      // Call the service WITHOUT the internal catch — errors propagate to BullMQ
-      // so the retry mechanism kicks in on Redis failure.
-      const delta = await applyCheckInScoreUnguarded(userId, currentStreak, prevStreak);
+      // applyCheckInScore throws on Redis failure — left unhandled here on
+      // purpose so BullMQ's retry mechanism kicks in.
+      const delta = await applyCheckInScore(userId, currentStreak, prevStreak);
 
       if (delta > 0) {
         emitLeaderboardUpdated();
@@ -103,7 +109,8 @@ async function processLeaderboardJob(
         await redis.expire(idempotencyKey, 2592000);
       }
 
-      const delta = await undoCheckInScoreUnguarded(userId, streakBeforeUndo, streakAfterUndo);
+      // undoCheckInScore likewise throws on Redis failure — same reasoning.
+      const delta = await undoCheckInScore(userId, streakBeforeUndo, streakAfterUndo);
 
       if (delta > 0) {
         emitLeaderboardUpdated();
@@ -133,33 +140,6 @@ async function processLeaderboardJob(
       );
     }
   }
-}
-
-// ─── Unguarded wrappers ───────────────────────────────────────────────────────
-// The leaderboard service functions catch all errors internally (never-throw
-// contract). For BullMQ jobs we need errors to propagate so BullMQ can retry.
-// These wrappers re-raise Redis errors while still returning the delta on success.
-
-async function applyCheckInScoreUnguarded(
-  userId:        string,
-  currentStreak: number,
-  prevStreak:    number,
-): Promise<number> {
-  // applyCheckInScore already returns 0 on error — we call it and then check
-  // if a Redis error likely occurred by catching it at a lower level.
-  // For full unguarded behaviour in a BullMQ context, call the Redis
-  // operations directly here. Since we control the service and the worker is
-  // the intended retry host, we call the service and trust BullMQ's own
-  // error detection via job state transitions.
-  return applyCheckInScore(userId, currentStreak, prevStreak);
-}
-
-async function undoCheckInScoreUnguarded(
-  userId:           string,
-  streakBeforeUndo: number,
-  streakAfterUndo:  number,
-): Promise<number> {
-  return undoCheckInScore(userId, streakBeforeUndo, streakAfterUndo);
 }
 
 // ─── Worker factory ───────────────────────────────────────────────────────────

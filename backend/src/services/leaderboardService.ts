@@ -111,57 +111,63 @@ function secondsUntilEndOfMonth(): number {
  * @param currentStreak  - The streak value AFTER this check-in.
  *
  * Returns the total delta awarded (useful for logging / testing).
- * Never throws.
+ *
+ * THROWS on any Redis failure (connection-level or a per-command error
+ * inside the pipeline) — this is now the only caller-facing behaviour.
+ * The BullMQ leaderboard worker is the sole caller and depends on the
+ * rejection to trigger a retry; do NOT call this from a fire-and-forget
+ * site without re-adding a catch, or a Redis failure will crash that path.
  */
 export async function applyCheckInScore(
   userId:        string,
   currentStreak: number,
   prevStreak     = 0,           // defaults to 0 if caller doesn't have it
 ): Promise<number> {
-  try {
-    // 1. Compute delta
-    let delta = BASE_SCORE;
+  // 1. Compute delta
+  let delta = BASE_SCORE;
 
-    // Milestone +50: streak crossed 7 this check-in
-    if (prevStreak < 7 && currentStreak >= 7) {
-      delta += MILESTONE_7_BONUS;
-    }
-
-    // Milestone +200: streak crossed 30 this check-in
-    if (prevStreak < 30 && currentStreak >= 30) {
-      delta += MILESTONE_30_BONUS;
-    }
-
-    // 2. ZINCRBY all three boards in a single pipeline (one round-trip)
-    const redis    = getRedisClient();
-    const pipeline = redis.pipeline();
-
-    pipeline.zincrby(LEADERBOARD_KEY.alltime, delta, userId);
-
-    // Weekly — increment then ensure TTL is set
-    pipeline.zincrby(LEADERBOARD_KEY.weekly, delta, userId);
-    pipeline.expire(LEADERBOARD_KEY.weekly, secondsUntilEndOfWeek());
-
-    // Monthly — increment then ensure TTL is set
-    pipeline.zincrby(LEADERBOARD_KEY.monthly, delta, userId);
-    pipeline.expire(LEADERBOARD_KEY.monthly, secondsUntilEndOfMonth());
-
-    await pipeline.exec();
-
-    console.info(
-      `[Leaderboard] +${delta} for user ${userId} ` +
-      `(streak: ${prevStreak}→${currentStreak}, ` +
-      `base:${BASE_SCORE}` +
-      (prevStreak < 7 && currentStreak >= 7 ? ` +milestone7:${MILESTONE_7_BONUS}` : '') +
-      (prevStreak < 30 && currentStreak >= 30 ? ` +milestone30:${MILESTONE_30_BONUS}` : '') +
-      ')',
-    );
-
-    return delta;
-  } catch (err: unknown) {
-    console.error('[Leaderboard] applyCheckInScore error:', (err as Error).message);
-    return 0; // never throw — leaderboard failure must not break check-in
+  // Milestone +50: streak crossed 7 this check-in
+  if (prevStreak < 7 && currentStreak >= 7) {
+    delta += MILESTONE_7_BONUS;
   }
+
+  // Milestone +200: streak crossed 30 this check-in
+  if (prevStreak < 30 && currentStreak >= 30) {
+    delta += MILESTONE_30_BONUS;
+  }
+
+  // 2. ZINCRBY all three boards in a single pipeline (one round-trip)
+  const redis    = getRedisClient();
+  const pipeline = redis.pipeline();
+
+  pipeline.zincrby(LEADERBOARD_KEY.alltime, delta, userId);
+
+  // Weekly — increment then ensure TTL is set
+  pipeline.zincrby(LEADERBOARD_KEY.weekly, delta, userId);
+  pipeline.expire(LEADERBOARD_KEY.weekly, secondsUntilEndOfWeek());
+
+  // Monthly — increment then ensure TTL is set
+  pipeline.zincrby(LEADERBOARD_KEY.monthly, delta, userId);
+  pipeline.expire(LEADERBOARD_KEY.monthly, secondsUntilEndOfMonth());
+
+  // A connection-level failure rejects exec() itself and propagates
+  // naturally. A per-command failure (e.g. WRONGTYPE) instead resolves
+  // exec() with an [err, result] tuple for that command — check for it
+  // explicitly so it isn't silently treated as a successful write.
+  const results    = await pipeline.exec();
+  const firstError = results?.find(([err]) => err != null)?.[0];
+  if (firstError) throw firstError;
+
+  console.info(
+    `[Leaderboard] +${delta} for user ${userId} ` +
+    `(streak: ${prevStreak}→${currentStreak}, ` +
+    `base:${BASE_SCORE}` +
+    (prevStreak < 7 && currentStreak >= 7 ? ` +milestone7:${MILESTONE_7_BONUS}` : '') +
+    (prevStreak < 30 && currentStreak >= 30 ? ` +milestone30:${MILESTONE_30_BONUS}` : '') +
+    ')',
+  );
+
+  return delta;
 }
 
 // ─── LeaderboardEntry type ────────────────────────────────────────────────────
@@ -297,72 +303,72 @@ export async function getUserRank(
  * @param streakBeforeUndo - Streak WITH today's check-in (before deletion).
  * @param streakAfterUndo  - Streak WITHOUT today's check-in (after deletion).
  *
- * Returns the total delta deducted. Never throws.
+ * Returns the total delta deducted.
+ *
+ * THROWS on any Redis failure (connection-level or a per-command error in
+ * either pipeline) — see applyCheckInScore's doc comment for why: the
+ * BullMQ worker is the sole caller and needs the rejection to retry.
  */
 export async function undoCheckInScore(
   userId:           string,
   streakBeforeUndo: number,
   streakAfterUndo:  number,
 ): Promise<number> {
-  try {
-    // Mirror the award formula exactly — compute what was given for that check-in
-    let delta = BASE_SCORE;
+  // Mirror the award formula exactly — compute what was given for that check-in
+  let delta = BASE_SCORE;
 
-    // Milestone -50: undo drops streak back below 7
-    if (streakAfterUndo < 7 && streakBeforeUndo >= 7) {
-      delta += MILESTONE_7_BONUS;
-    }
-
-    // Milestone -200: undo drops streak back below 30
-    if (streakAfterUndo < 30 && streakBeforeUndo >= 30) {
-      delta += MILESTONE_30_BONUS;
-    }
-
-    const redis    = getRedisClient();
-    const pipeline = redis.pipeline();
-
-    pipeline.zincrby(LEADERBOARD_KEY.alltime,  -delta, userId);
-    pipeline.zincrby(LEADERBOARD_KEY.weekly,   -delta, userId);
-    pipeline.zincrby(LEADERBOARD_KEY.monthly,  -delta, userId);
-
-    const results = await pipeline.exec();
-
-    // Clamp any board that went negative → 0.
-    // Two-step (non-atomic) is acceptable here: a brief negative value is cosmetic.
-    // Task 11 BullMQ worker will wrap this in a Lua script for atomic clamp.
-    if (results) {
-      const keyOrder = [
-        LEADERBOARD_KEY.alltime,
-        LEADERBOARD_KEY.weekly,
-        LEADERBOARD_KEY.monthly,
-      ] as const;
-      const clampPipeline = redis.pipeline();
-      let needsClamp = false;
-
-      for (let i = 0; i < keyOrder.length; i++) {
-        const score = parseFloat(String(results[i]?.[1] ?? '0'));
-        if (score < 0) {
-          clampPipeline.zadd(keyOrder[i]!, 0, userId);
-          needsClamp = true;
-        }
-      }
-
-      if (needsClamp) await clampPipeline.exec();
-    }
-
-    console.info(
-      `[Leaderboard] -${delta} for user ${userId} ` +
-      `(undo: streak ${streakBeforeUndo}→${streakAfterUndo}` +
-      (streakAfterUndo < 7  && streakBeforeUndo >= 7  ? ` -milestone7:${MILESTONE_7_BONUS}` : '') +
-      (streakAfterUndo < 30 && streakBeforeUndo >= 30 ? ` -milestone30:${MILESTONE_30_BONUS}` : '') +
-      ')',
-    );
-
-    return delta;
-  } catch (err: unknown) {
-    console.error('[Leaderboard] undoCheckInScore error:', (err as Error).message);
-    return 0; // never throw
+  // Milestone -50: undo drops streak back below 7
+  if (streakAfterUndo < 7 && streakBeforeUndo >= 7) {
+    delta += MILESTONE_7_BONUS;
   }
+
+  // Milestone -200: undo drops streak back below 30
+  if (streakAfterUndo < 30 && streakBeforeUndo >= 30) {
+    delta += MILESTONE_30_BONUS;
+  }
+
+  const redis    = getRedisClient();
+  const pipeline = redis.pipeline();
+
+  pipeline.zincrby(LEADERBOARD_KEY.alltime,  -delta, userId);
+  pipeline.zincrby(LEADERBOARD_KEY.weekly,   -delta, userId);
+  pipeline.zincrby(LEADERBOARD_KEY.monthly,  -delta, userId);
+
+  const results    = await pipeline.exec();
+  const firstError = results?.find(([err]) => err != null)?.[0];
+  if (firstError) throw firstError;
+
+  // Clamp any board that went negative → 0.
+  // Two-step (non-atomic) is acceptable here: a brief negative value is cosmetic.
+  if (results) {
+    const keyOrder = [
+      LEADERBOARD_KEY.alltime,
+      LEADERBOARD_KEY.weekly,
+      LEADERBOARD_KEY.monthly,
+    ] as const;
+    const clampPipeline = redis.pipeline();
+    let needsClamp = false;
+
+    for (let i = 0; i < keyOrder.length; i++) {
+      const score = parseFloat(String(results[i]?.[1] ?? '0'));
+      if (score < 0) {
+        clampPipeline.zadd(keyOrder[i]!, 0, userId);
+        needsClamp = true;
+      }
+    }
+
+    if (needsClamp) await clampPipeline.exec();
+  }
+
+  console.info(
+    `[Leaderboard] -${delta} for user ${userId} ` +
+    `(undo: streak ${streakBeforeUndo}→${streakAfterUndo}` +
+    (streakAfterUndo < 7  && streakBeforeUndo >= 7  ? ` -milestone7:${MILESTONE_7_BONUS}` : '') +
+    (streakAfterUndo < 30 && streakBeforeUndo >= 30 ? ` -milestone30:${MILESTONE_30_BONUS}` : '') +
+    ')',
+  );
+
+  return delta;
 }
 
 // ─── RecomputeResult type ─────────────────────────────────────────────────────
