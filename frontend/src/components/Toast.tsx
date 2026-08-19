@@ -37,7 +37,7 @@ export default function Toast({
                  px-5 py-3.5 rounded-2xl
                  bg-ink text-white text-sm
                  shadow-panel animate-fade-up"
-      style={{ fontFamily: "'Inter', sans-serif", maxWidth: '420px', width: 'max-content' }}
+      style={{ maxWidth: '420px', width: 'max-content' }}
     >
       <span className="text-base flex-shrink-0">⚠️</span>
       <span className="flex-1 leading-snug">{message}</span>

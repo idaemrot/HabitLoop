@@ -57,8 +57,7 @@ function DailyProgress({ habits, today }: { habits: Habit[]; today: string }): J
         </div>
       </div>
       <div
-        className="flex items-center gap-4 text-xs text-muted shrink-0"
-        style={{ fontFamily: "'JetBrains Mono', monospace" }}
+        className="flex items-center gap-4 text-xs font-mono text-muted shrink-0"
       >
         <span>🔥 {totalStreak}d total</span>
         <span className="w-px h-3 bg-border" aria-hidden="true" />
@@ -115,7 +114,7 @@ export default function DashboardPage(): JSX.Element {
       {/* ── Navbar ──────────────────────────────────────────────────────── */}
       <nav className="navbar">
         <Link to="/" className="flex items-center group w-fit">
-          <span className="display-sm text-sm text-ink group-hover:text-purple transition-colors" style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700 }}>
+          <span className="display-sm font-bold text-sm text-ink group-hover:text-purple transition-colors">
             HabitLoop
           </span>
         </Link>
@@ -162,7 +161,7 @@ export default function DashboardPage(): JSX.Element {
         {/* Compact header — date + heading, not a marketing banner */}
         <div className="flex items-end justify-between mb-6 gap-4">
           <div>
-            <p className="text-xs text-muted mb-1" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+            <p className="text-xs font-mono text-muted mb-1">
               {formattedDate}
             </p>
             <h1 className="display-md text-ink">Your habits</h1>
@@ -221,8 +220,7 @@ export default function DashboardPage(): JSX.Element {
                   <div className="mt-4">
                     <button
                       onClick={() => setShowArchived((v) => !v)}
-                      className="flex items-center gap-2 text-xs text-muted hover:text-ink transition-colors mb-3"
-                      style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                      className="flex items-center gap-2 text-xs font-display text-muted hover:text-ink transition-colors mb-3"
                     >
                       <span>{showArchived ? '▼' : '▶'}</span>
                       Archived · {archivedHabits.length}

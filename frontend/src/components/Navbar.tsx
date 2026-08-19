@@ -12,28 +12,29 @@ export default function Navbar(): JSX.Element {
       {/* Logo */}
       <Link to="/" className="flex items-center group">
         <span
-          className="display-sm text-ink group-hover:text-purple transition-colors duration-200"
-          style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700 }}
+          className="display-sm font-bold text-ink group-hover:text-purple transition-colors duration-200"
         >
           HabitLoop
         </span>
       </Link>
 
-      {/* Nav links */}
-      <div className="hidden md:flex items-center gap-6">
-        <a
-          href="#features"
-          className="text-sm text-muted hover:text-ink transition-colors duration-150 font-medium"
-        >
-          Features
-        </a>
-        <a
-          href="#how-it-works"
-          className="text-sm text-muted hover:text-ink transition-colors duration-150 font-medium"
-        >
-          How it works
-        </a>
-      </div>
+      {/* Nav links — anchor into landing-page sections, so only meaningful there */}
+      {isHome && (
+        <div className="hidden md:flex items-center gap-6">
+          <a
+            href="#features"
+            className="text-sm text-muted hover:text-ink transition-colors duration-150 font-medium"
+          >
+            Features
+          </a>
+          <a
+            href="#how-it-works"
+            className="text-sm text-muted hover:text-ink transition-colors duration-150 font-medium"
+          >
+            How it works
+          </a>
+        </div>
+      )}
 
       {/* CTA */}
       <div className="flex items-center gap-3">

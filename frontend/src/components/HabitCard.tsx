@@ -135,10 +135,9 @@ export default function HabitCard({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <h3
-            className={`text-sm font-semibold leading-snug truncate transition-colors duration-200 ${
+            className={`text-sm font-semibold font-display leading-snug truncate transition-colors duration-200 ${
               checkedToday ? 'text-muted' : 'text-ink'
             }`}
-            style={{ fontFamily: "'Space Grotesk', sans-serif" }}
             title={habit.title}
           >
             {habit.title}

@@ -29,11 +29,10 @@ export default function NotFoundPage(): JSX.Element {
 
       {/* Decorative number */}
       <p
-        className="absolute bottom-8 text-[20vw] font-black select-none pointer-events-none"
+        className="absolute bottom-8 text-[20vw] font-black font-display select-none pointer-events-none"
         style={{
           color: 'transparent',
           WebkitTextStroke: '1px #E0E0E0',
-          fontFamily: "'Space Grotesk', sans-serif",
           zIndex: 0,
         }}
       >

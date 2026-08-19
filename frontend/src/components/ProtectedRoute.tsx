@@ -7,8 +7,7 @@ function SessionLoader(): JSX.Element {
     <div className="min-h-screen bg-canvas flex items-center justify-center">
       <div className="flex flex-col items-center gap-4">
         <span
-          className="display-sm text-xl text-ink animate-pulse"
-          style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700 }}
+          className="display-sm font-bold text-xl text-ink animate-pulse"
         >
           HabitLoop
         </span>

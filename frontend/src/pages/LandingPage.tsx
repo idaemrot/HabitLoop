@@ -13,16 +13,17 @@ function DashboardPreview(): JSX.Element {
     { icon: 'meditate', color: '#6C5CE7', title: 'Morning meditation', streak: 14, done: true },
     { icon: 'book',     color: '#74C0FC', title: 'Read 30 min',        streak: 7,  done: true },
     { icon: 'run',      color: '#D4FF4F', title: 'Evening run',        streak: 3,  done: false },
+    { icon: 'water',    color: '#FF7675', title: 'Cold shower',        streak: 21, done: false },
   ];
 
   return (
-    <div className="card p-5 w-full max-w-md">
-      <div className="flex items-center justify-between mb-4">
+    <div className="card p-6 md:p-7 w-full">
+      <div className="flex items-center justify-between mb-5">
         <p className="text-sm font-semibold text-ink">Today's progress</p>
-        <p className="text-sm text-muted tabular-nums">2/3</p>
+        <p className="text-sm text-muted tabular-nums">2/4</p>
       </div>
-      <div className="h-2 rounded-full bg-border/60 overflow-hidden mb-5">
-        <div className="h-full rounded-full bg-lime" style={{ width: '66%' }} />
+      <div className="h-2 rounded-full bg-border/60 overflow-hidden mb-6">
+        <div className="h-full rounded-full bg-lime" style={{ width: '50%' }} />
       </div>
       <div className="flex flex-col gap-1">
         {rows.map((r) => (
@@ -39,8 +40,7 @@ function DashboardPreview(): JSX.Element {
             </div>
             <div className="flex-1 min-w-0">
               <p
-                className={`text-sm font-semibold truncate ${r.done ? 'text-muted' : 'text-ink'}`}
-                style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                className={`text-sm font-semibold font-display truncate ${r.done ? 'text-muted' : 'text-ink'}`}
               >
                 {r.title}
               </p>
@@ -68,12 +68,6 @@ function DashboardPreview(): JSX.Element {
 export default function LandingPage(): JSX.Element {
   const { user } = useAuth();
 
-  const benefits = [
-    'One tap to check in — streaks and best-ever are calculated for you',
-    "See friends' progress the moment they check in",
-    'Compete on a live weekly, monthly, and all-time leaderboard',
-  ];
-
   const steps = [
     { title: 'Define your habits', body: 'Add a name, frequency, color, and icon. Takes 30 seconds.' },
     { title: 'Check in daily',     body: 'One tap to log completion. Streaks calculated automatically.' },
@@ -84,44 +78,39 @@ export default function LandingPage(): JSX.Element {
     <div className="min-h-screen bg-canvas">
       <Navbar />
 
-      {/* ── Hero ─────────────────────────────────────────────────────────── */}
-      <section id="features" className="pt-32 pb-20 px-6 max-w-6xl mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-[1.1fr,1fr] gap-16 items-center">
-          {/* Copy */}
-          <div>
-            <h1 className="display-xl text-left text-ink mb-6 animate-fade-up animate-delay-100">
-              Build habits that{' '}
-              <span className="relative inline-block mt-2">
-                <span className="bg-lime px-4 py-1 rounded-xl border border-border shadow-sm inline-block -rotate-1">actually stick.</span>
-              </span>
-            </h1>
-            <p className="text-left text-muted text-lg animate-fade-up animate-delay-200 max-w-lg mb-8 leading-relaxed">
-              Track your habits, check in once a day, and let HabitLoop keep score of the streak.
+      {/* ── Hero ─────────────────────────────────────────────────────────────
+          Typography carries the page — no highlight block, no gradient text,
+          one word marked with a narrow underline instead. One primary action. */}
+      <section id="features" className="pt-32 pb-16 px-6 max-w-6xl mx-auto">
+        <p className="label-upper mb-5 animate-fade-up">Habit tracking, without the noise</p>
+        <h1 className="display-xl text-left text-ink mb-7 animate-fade-up animate-delay-100 max-w-3xl">
+          Build habits that<br />
+          <span className="mark-lime">actually stick.</span>
+        </h1>
+        <p className="text-left text-muted text-lg animate-fade-up animate-delay-200 max-w-md mb-9 leading-relaxed">
+          Track your habits, check in once a day, and let HabitLoop keep score of the streak.
+        </p>
+        <div className="animate-fade-up animate-delay-300">
+          {user ? (
+            <Link to="/dashboard" className="btn-lime text-sm px-8 py-3.5">Go to Dashboard →</Link>
+          ) : (
+            <Link to="/signup" className="btn-lime text-sm px-8 py-3.5">Start for free →</Link>
+          )}
+        </div>
+      </section>
+
+      {/* ── Product showcase ───────────────────────────────────────────────────
+          The product is the pitch — a full, credible dashboard presentation
+          with its own section, not a shrunken card wedged beside the headline. */}
+      <section className="px-6 pb-24 max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-[260px,1fr] gap-8 lg:gap-12 items-start">
+          <div className="lg:pt-2">
+            <p className="label-upper mb-3">The product</p>
+            <p className="text-ink text-base leading-relaxed">
+              One tap to check in — streaks and best-ever are calculated for you, and friends see it the moment it happens.
             </p>
-
-            <ul className="flex flex-col gap-3 mb-9 animate-fade-up animate-delay-300 max-w-md">
-              {benefits.map((b) => (
-                <li key={b} className="flex items-start gap-3">
-                  <span className="w-1.5 h-1.5 rounded-full bg-lime-dark shrink-0 mt-2" aria-hidden="true" />
-                  <p className="text-sm text-ink leading-relaxed">{b}</p>
-                </li>
-              ))}
-            </ul>
-
-            <div className="flex items-center gap-4 animate-fade-up animate-delay-400">
-              {user ? (
-                <Link to="/dashboard" className="btn-lime text-sm px-8 py-3.5">Go to Dashboard →</Link>
-              ) : (
-                <Link to="/signup" className="btn-lime text-sm px-8 py-3.5">Start for free →</Link>
-              )}
-              <a href="#how-it-works" className="btn-ghost text-sm px-8 py-3.5">See how it works</a>
-            </div>
           </div>
-
-          {/* Product preview */}
-          <div className="flex justify-center lg:justify-end animate-fade-up animate-delay-300">
-            <DashboardPreview />
-          </div>
+          <DashboardPreview />
         </div>
       </section>
 
@@ -135,8 +124,8 @@ export default function LandingPage(): JSX.Element {
           {steps.map((s, i) => (
             <div key={s.title} className={i > 0 ? 'md:pl-8 md:border-l md:border-border' : ''}>
               <span
-                className="block text-6xl font-bold leading-none mb-4 select-none"
-                style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--border)' }}
+                className="block text-6xl font-bold font-display leading-none mb-4 select-none"
+                style={{ color: 'var(--border)' }}
                 aria-hidden="true"
               >
                 0{i + 1}
@@ -172,7 +161,7 @@ export default function LandingPage(): JSX.Element {
         </div>
         <div className="border-t border-border">
           <div className="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
-            <span className="text-sm font-bold text-ink" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>HabitLoop</span>
+            <span className="text-sm font-bold font-display text-ink">HabitLoop</span>
             <p className="text-xs text-muted">© 2024 HabitLoop</p>
           </div>
         </div>

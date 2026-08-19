@@ -196,12 +196,11 @@ export default function HabitModal({
                   key={f}
                   type="button"
                   onClick={() => setFrequency(f)}
-                  className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-all ${
+                  className={`flex-1 py-2 rounded-xl text-xs font-semibold font-display border transition-all ${
                     frequency === f
                       ? 'bg-ink text-white border-ink'
                       : 'bg-canvas text-muted border-border hover:border-ink'
                   }`}
-                  style={{ fontFamily: "'Space Grotesk', sans-serif" }}
                 >
                   {f.charAt(0) + f.slice(1).toLowerCase()}
                 </button>

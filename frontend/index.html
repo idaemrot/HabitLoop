@@ -7,6 +7,15 @@
   <meta name="description"
     content="HabitLoop — Build powerful daily habits with streak tracking, insights, and accountability." />
   <meta name="theme-color" content="#D4FF4F" />
+  <!-- Fonts — preconnect + <link> instead of a CSS @import, which is
+       render-blocking (the browser can't start fetching the imported
+       stylesheet until it has fetched and parsed index.css first). This
+       lets the font fetch start in parallel with everything else. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet" />
   <!-- Open Graph -->
   <meta property="og:title" content="HabitLoop — Build Unstoppable Habits" />
   <meta property="og:description" content="Track habits, build streaks, and transform your daily routine." />

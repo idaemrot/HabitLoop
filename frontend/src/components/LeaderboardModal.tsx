@@ -12,10 +12,9 @@ function PeriodTab({ label, value: _value, active, onClick }: {
   return (
     <button
       onClick={onClick}
-      className={`px-3 py-1.5 rounded-pill text-xs font-semibold transition-colors duration-150 ${
+      className={`px-3 py-1.5 rounded-pill text-xs font-semibold font-display transition-colors duration-150 ${
         active ? 'bg-ink text-white' : 'text-muted hover:text-ink border border-border hover:border-ink'
       }`}
-      style={{ fontFamily: "'Space Grotesk', sans-serif" }}
     >
       {label}
     </button>
@@ -37,28 +36,28 @@ function SkeletonRow(): JSX.Element {
 // ─── EntryRow ─────────────────────────────────────────────────────────────────
 function EntryRow({ entry, isMe }: { entry: LeaderboardEntry; isMe: boolean }): JSX.Element {
   const medal = MEDAL[entry.rank];
+  const top3  = entry.rank <= 3;
   const hue   = (entry.username.charCodeAt(0) * 37) % 360;
 
   return (
     <div
-      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-150 ${
+      className={`flex items-center gap-3 px-3 rounded-lg transition-colors duration-150 ${top3 ? 'py-3' : 'py-2.5'} ${
         isMe ? 'bg-lime/10 border-l-2 border-lime' : 'border-l-2 border-transparent hover:bg-canvas/60'
       }`}
     >
-      {/* Rank */}
+      {/* Rank — top 3 get scale, not a colored card */}
       <div
-        className="w-6 text-center font-bold shrink-0 text-xs text-muted"
-        style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+        className={`text-center font-bold font-display shrink-0 text-muted ${top3 ? 'w-7 text-lg' : 'w-6 text-xs'}`}
       >
         {medal ?? `#${entry.rank}`}
       </div>
 
       {/* Avatar */}
       {entry.avatarUrl ? (
-        <img src={entry.avatarUrl} alt={entry.username} className="w-8 h-8 rounded-full object-cover shrink-0" />
+        <img src={entry.avatarUrl} alt={entry.username} className={`rounded-full object-cover shrink-0 ${top3 ? 'w-9 h-9' : 'w-8 h-8'}`} />
       ) : (
         <div
-          className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+          className={`rounded-full flex items-center justify-center font-bold shrink-0 ${top3 ? 'w-9 h-9 text-sm' : 'w-8 h-8 text-xs'}`}
           style={{ background: `hsl(${hue},60%,88%)`, color: `hsl(${hue},50%,30%)` }}
         >
           {entry.username.charAt(0).toUpperCase()}
@@ -67,7 +66,9 @@ function EntryRow({ entry, isMe }: { entry: LeaderboardEntry; isMe: boolean }): 
 
       {/* Username */}
       <div className="flex-1 min-w-0 flex items-center gap-1.5">
-        <p className="text-sm font-semibold text-ink truncate" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+        <p
+          className={`font-semibold font-display text-ink truncate ${top3 ? 'text-base' : 'text-sm'}`}
+        >
           {entry.username}
         </p>
         {isMe && (
@@ -79,8 +80,7 @@ function EntryRow({ entry, isMe }: { entry: LeaderboardEntry; isMe: boolean }): 
 
       {/* Score */}
       <div
-        className="text-xs font-bold shrink-0 tabular-nums text-ink"
-        style={{ fontFamily: "'JetBrains Mono', monospace" }}
+        className={`font-bold font-mono shrink-0 tabular-nums text-ink ${top3 ? 'text-sm' : 'text-xs'}`}
       >
         {entry.score.toLocaleString()}
         <span className="font-normal text-muted ml-0.5">pts</span>
@@ -142,9 +142,9 @@ export default function LeaderboardModal({ onClose }: LeaderboardModalProps): JS
           <div className="mx-5 mt-3 flex items-center gap-2 text-xs text-muted shrink-0">
             <span className="w-1.5 h-1.5 rounded-full bg-lime shrink-0" aria-hidden="true" />
             You're ranked
-            <span className="font-bold text-ink" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>#{myRank.rank}</span>
+            <span className="font-bold font-display text-ink">#{myRank.rank}</span>
             <span aria-hidden="true">·</span>
-            <span className="font-semibold text-ink tabular-nums" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+            <span className="font-semibold font-mono text-ink tabular-nums">
               {myRank.score.toLocaleString()} pts
             </span>
           </div>

@@ -18,6 +18,22 @@ export interface FeedItemData {
   activityType:  string;
   metadata:      any;
   createdAt:     string;
+  // Only present for live socket-delivered check-ins — the REST feed's
+  // stored Activity.metadata doesn't carry a streak count, so historical
+  // items simply omit this rather than showing a fabricated number.
+  currentStreak?: number;
+}
+
+// ─── Relative time ────────────────────────────────────────────────────────────
+function timeAgo(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diffMs / 60_000);
+  if (mins < 1)   return 'just now';
+  if (mins < 60)  return `${mins} min ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} hr ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
 }
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
@@ -99,7 +115,8 @@ export default function FriendFeed(): JSX.Element {
         habitTitle:    payload.habitTitle,
         completedDate: payload.completedDate,
       },
-      createdAt:     payload.createdAt,
+      createdAt:      payload.createdAt,
+      currentStreak:  payload.currentStreak,
     };
 
     // Add to top of feed with a subtle entry animation
@@ -149,16 +166,15 @@ export default function FriendFeed(): JSX.Element {
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-ink leading-snug">
                   <strong className="font-semibold">{item.username}</strong> completed{' '}
-                  <span
-                    className="inline-flex items-center gap-1 font-medium px-1.5 py-px rounded"
-                    style={{ backgroundColor: `${item.habitColor}18`, color: item.habitColor }}
-                  >
-                    <span>{item.habitIcon}</span>
+                  <span className="font-medium" style={{ color: item.habitColor }}>
                     {item.metadata?.habitTitle || item.habitTitle}
                   </span>
                 </p>
                 <p className="text-xs text-muted mt-1">
-                  {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {item.currentStreak != null && (
+                    <>{item.currentStreak} day streak<span className="mx-1.5" aria-hidden="true">·</span></>
+                  )}
+                  {timeAgo(item.createdAt)}
                 </p>
               </div>
             </div>

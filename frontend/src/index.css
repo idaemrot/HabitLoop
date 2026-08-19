@@ -1,5 +1,5 @@
-/* ─── Fonts (must precede @tailwind) ─────────────────────────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+/* ─── Fonts ───────────────────────────────────────────────────────────────
+   Loaded via <link> in index.html, not @import here — see that file for why. */
 
 @tailwind base;
 @tailwind components;
@@ -13,6 +13,7 @@
   --border:        #E0E0E0;
   --lime:          #D4FF4F;
   --lime-hover:    #C4EF3F;
+  --lime-dark:     #9DC200;
   --purple:        #6C5CE7;
   --sky:           #74C0FC;
   --panel-bg:      #111118;
@@ -81,6 +82,16 @@ body {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+/* Restrained emphasis mark — a narrow underline beneath a single word/phrase,
+   not a highlight block. The one deliberate lime moment in a headline. */
+.mark-lime {
+  color: var(--lime-dark);
+  background-image: linear-gradient(var(--lime) 0 0);
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 100% 0.14em;
+  padding-bottom: 0.06em;
 }
 
 /* ─── Accessibility: keyboard focus ──────────────────────────────────────────
@@ -217,12 +228,16 @@ textarea:focus-visible,
     font-family: 'Space Grotesk', sans-serif;
   }
 
-  /* ── Navbar ──────────────────────────────────────────────────────────── */
+  /* ── Navbar ──────────────────────────────────────────────────────────────
+     A floating, inset capsule rather than a full-bleed bar with a bottom
+     border — navigation as a self-contained designed object, not a generic
+     flat Tailwind header. */
   .navbar {
-    @apply fixed top-0 left-0 right-0 z-50
+    @apply fixed top-3 left-3 right-3 md:top-4 md:left-6 md:right-6 z-50
+           mx-auto max-w-6xl
            flex items-center justify-between
-           px-6 py-4
-           bg-canvas/80 border-b border-border;
+           px-4 py-2.5 md:px-5 md:py-3 rounded-full
+           bg-surface/90 border border-border shadow-card;
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
   }

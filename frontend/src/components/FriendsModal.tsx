@@ -139,10 +139,9 @@ export default function FriendsModal({ onClose }: FriendsModalProps): JSX.Elemen
             <button
               key={t.value}
               onClick={() => setTab(t.value)}
-              className={`px-4 py-1.5 rounded-pill text-xs font-semibold transition-all ${
+              className={`px-4 py-1.5 rounded-pill text-xs font-semibold font-display transition-all ${
                 tab === t.value ? 'bg-ink text-white' : 'text-muted hover:text-ink border border-border hover:border-ink'
               }`}
-              style={{ fontFamily: "'Space Grotesk', sans-serif" }}
             >
               {t.label}
             </button>
@@ -192,7 +191,7 @@ export default function FriendsModal({ onClose }: FriendsModalProps): JSX.Elemen
                   <div key={user.id} className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border bg-surface">
                     <Avatar user={user} />
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-ink text-sm truncate" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+                      <p className="font-semibold font-display text-ink text-sm truncate">
                         {user.username}
                       </p>
                       {alreadyFriend && <p className="text-xs text-muted">Already friends</p>}
@@ -226,7 +225,7 @@ export default function FriendsModal({ onClose }: FriendsModalProps): JSX.Elemen
                 <div key={req.id} className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border bg-surface">
                   <Avatar user={req.requester} />
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-ink text-sm truncate" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+                    <p className="font-semibold font-display text-ink text-sm truncate">
                       {req.requester.username}
                     </p>
                     <p className="text-xs text-muted">wants to be your friend</p>
@@ -254,7 +253,7 @@ export default function FriendsModal({ onClose }: FriendsModalProps): JSX.Elemen
                 <div key={friendship.id} className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border bg-surface">
                   <Avatar user={friend} />
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-ink text-sm truncate" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+                    <p className="font-semibold font-display text-ink text-sm truncate">
                       {friend.username}
                     </p>
                     <p className="text-xs text-muted">Friend</p>

@@ -35,7 +35,11 @@ export default {
         },
       },
       fontFamily: {
-        display: ['"Space Grotesk"', '"Archivo"', 'system-ui', 'sans-serif'],
+        // "Archivo" was previously listed as a fallback here but was never
+        // actually loaded (not in the Google Fonts URL) — a dead reference
+        // that did nothing. Removed rather than added, to avoid pulling in
+        // a font family nothing in the app is designed around.
+        display: ['"Space Grotesk"', 'system-ui', 'sans-serif'],
         sans:    ['"Inter"',         'system-ui', 'sans-serif'],
         mono:    ['"JetBrains Mono"','monospace'],
       },
