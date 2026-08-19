@@ -1,38 +1,47 @@
 import { useState, useRef } from 'react';
 import type { Habit } from '../types';
+import { HabitIcon } from './HabitIcon';
 
-// ─── Icon map ─────────────────────────────────────────────────────────────────
-const ICON_MAP: Record<string, string> = {
-  flame:    '🔥', book:    '📖', run:    '🏃', meditate: '🧘',
-  water:    '💧', barbell: '💪', pen:    '✍️', star:     '⭐',
-  moon:     '🌙', apple:   '🍎', music:  '🎵', code:     '💻',
-};
-
-function getIcon(icon: string): string {
-  return ICON_MAP[icon] ?? '🔥';
-}
-
-// ─── Streak ring ──────────────────────────────────────────────────────────────
-function StreakRing({ current, longest }: { current: number; longest: number }): JSX.Element {
-  const pct     = longest > 0 ? Math.min((current / longest) * 100, 100) : 0;
-  const radius  = 18;
-  const circ    = 2 * Math.PI * radius;
-  const dash    = (pct / 100) * circ;
-
+// ─── Small line icons (no icon library — kept dependency-free) ────────────────
+function EditIcon(): JSX.Element {
   return (
-    <div className="relative flex items-center justify-center w-12 h-12">
-      <svg className="absolute inset-0 -rotate-90" width="48" height="48">
-        <circle cx="24" cy="24" r={radius} fill="none" stroke="#E0E0E0" strokeWidth="3" />
-        <circle
-          cx="24" cy="24" r={radius} fill="none"
-          stroke="#D4FF4F" strokeWidth="3"
-          strokeDasharray={`${dash} ${circ}`}
-          strokeLinecap="round"
-          style={{ transition: 'stroke-dasharray 0.6s ease' }}
-        />
-      </svg>
-      <span className="text-xs font-bold text-ink z-10">{current}</span>
-    </div>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
+  );
+}
+function ArchiveIcon(): JSX.Element {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="4" rx="1" />
+      <path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8" />
+      <path d="M10 13h4" />
+    </svg>
+  );
+}
+function TrashIcon(): JSX.Element {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 6h18" />
+      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+    </svg>
+  );
+}
+function CheckIcon(): JSX.Element {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+}
+function Spinner({ size = 16 }: { size?: number }): JSX.Element {
+  return (
+    <svg className="animate-spin" width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+    </svg>
   );
 }
 
@@ -101,136 +110,112 @@ export default function HabitCard({
     }
   };
 
+  const streakLabel = current > 0
+    ? `🔥 ${current} day${current === 1 ? '' : 's'}${longest > current ? ` · best ${longest}` : ''}`
+    : longest > 0
+      ? `Best ${longest} day${longest === 1 ? '' : 's'}`
+      : 'No streak yet';
+
   return (
     <div
-      className={`card p-5 flex flex-col gap-4 transition-all duration-200 ${
-        habit.isArchived ? 'opacity-50' : ''
+      className={`card flex items-center gap-3.5 pl-3.5 pr-3 py-3 transition-opacity duration-200 ${
+        habit.isArchived ? 'opacity-55' : ''
       }`}
+      style={{ borderLeft: `3px solid ${habit.color}` }}
     >
-      {/* Header row */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          {/* Icon badge */}
-          <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
-            style={{ backgroundColor: habit.color }}
+      {/* Icon badge — the habit's color identity, contained rather than flooding the row */}
+      <div
+        className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 text-ink transition-opacity duration-200"
+        style={{ backgroundColor: habit.color, opacity: checkedToday ? 0.65 : 1 }}
+      >
+        <HabitIcon icon={habit.icon} width={18} height={18} />
+      </div>
+
+      {/* Title + meta — the primary content, not a stat grid */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <h3
+            className={`text-sm font-semibold leading-snug truncate transition-colors duration-200 ${
+              checkedToday ? 'text-muted' : 'text-ink'
+            }`}
+            style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+            title={habit.title}
           >
-            {getIcon(habit.icon)}
-          </div>
-
-          {/* Title + meta */}
-          <div className="min-w-0">
-            <h3 className="display-sm text-ink text-sm leading-snug truncate" title={habit.title}>
-              {habit.title}
-            </h3>
-            <div className="flex items-center gap-2 mt-0.5">
-              <span className="badge-lime text-[10px] px-2 py-0.5">
-                {habit.frequency.charAt(0) + habit.frequency.slice(1).toLowerCase()}
-              </span>
-              {habit.isArchived && (
-                <span className="badge-dark text-[10px] px-2 py-0.5">Archived</span>
-              )}
-            </div>
-          </div>
+            {habit.title}
+          </h3>
+          {habit.isArchived && (
+            <span className="badge-dark text-[10px] px-2 py-0.5 shrink-0">Archived</span>
+          )}
         </div>
-
-        {/* Streak ring */}
-        <StreakRing current={current} longest={longest} />
-      </div>
-
-      {/* Description */}
-      {habit.description && (
-        <p className="text-xs text-muted leading-relaxed line-clamp-2">
-          {habit.description}
+        <p className="text-xs text-muted mt-0.5 truncate">
+          {habit.frequency.charAt(0) + habit.frequency.slice(1).toLowerCase()} · {streakLabel}
         </p>
-      )}
-
-      {/* Stats row */}
-      <div className="grid grid-cols-3 gap-2">
-        {[
-          { label: 'Current',  value: `${current}d` },
-          { label: 'Best',     value: `${longest}d` },
-          { label: 'Today',    value: checkedToday ? '✓' : '—' },
-        ].map((s) => (
-          <div key={s.label} className="rounded-xl bg-canvas border border-border px-2 py-2 text-center">
-            <p className="text-xs font-bold text-ink" style={{ color: s.label === 'Today' && checkedToday ? '#D4FF4F' : undefined }}>
-              {s.value}
-            </p>
-            <p className="text-[10px] text-muted mt-0.5">{s.label}</p>
-          </div>
-        ))}
       </div>
 
-      {/* Check-in button — primary action, displayed above utility buttons */}
+      {/* Utility actions — compact icon buttons, not permanent text rows */}
+      {!habit.isArchived && (
+        <button
+          onClick={() => onEdit(habit)}
+          className="btn-icon"
+          title="Edit habit"
+          aria-label={`Edit ${habit.title}`}
+        >
+          <EditIcon />
+        </button>
+      )}
+      <button
+        onClick={() => void onArchive(habit.id, !habit.isArchived)}
+        className="btn-icon"
+        title={habit.isArchived ? 'Unarchive habit' : 'Archive habit'}
+        aria-label={habit.isArchived ? `Unarchive ${habit.title}` : `Archive ${habit.title}`}
+      >
+        <ArchiveIcon />
+      </button>
+      <button
+        onClick={() => {
+          if (confirm(`Delete "${habit.title}"? This cannot be undone.`)) {
+            onDelete(habit.id).catch(() => {
+              onError(`Failed to delete "${habit.title}". Please try again.`);
+            });
+          }
+        }}
+        className="btn-icon hover:text-red-600"
+        title="Delete habit"
+        aria-label={`Delete ${habit.title}`}
+      >
+        <TrashIcon />
+      </button>
+
+      {/* Check-in control — the single most important interaction on this row */}
       {!habit.isArchived && (
         <button
           id={`checkin-${habit.id}`}
           onClick={() => void handleCheckIn()}
           disabled={isChecking}
-          className={`w-full py-2.5 rounded-xl text-sm font-semibold
-                     transition-all duration-200 flex items-center justify-center gap-2
+          aria-pressed={checkedToday}
+          className={`group relative w-10 h-10 rounded-full flex items-center justify-center shrink-0
+                     border-2 transition-all duration-150
                      disabled:opacity-50 disabled:cursor-not-allowed
+                     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/30 focus-visible:ring-offset-2
                      ${
                        checkedToday
-                         ? 'bg-lime text-ink hover:bg-red-50 hover:text-red-600 hover:border hover:border-red-200'
-                         : 'bg-ink text-white hover:bg-ink/80'
+                         ? 'bg-lime border-lime text-ink hover:bg-red-50 hover:border-red-300 hover:text-red-500'
+                         : 'bg-transparent border-border text-transparent hover:border-ink'
                      }`}
-          style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-          title={checkedToday ? 'Click to undo today\'s check-in' : 'Mark as done for today'}
+          title={checkedToday ? "Click to undo today's check-in" : 'Mark as done for today'}
         >
           {isChecking ? (
-            <>
-              <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-              </svg>
-              {checkedToday ? 'Undoing…' : 'Checking in…'}
-            </>
+            <span className="text-ink">
+              <Spinner />
+            </span>
           ) : checkedToday ? (
             <>
-              <span>✓</span> Done today
+              <span className="group-hover:hidden"><CheckIcon /></span>
+              <span className="hidden group-hover:inline text-xs font-bold leading-none">✕</span>
             </>
-          ) : (
-            <>
-              <span>○</span> Check in today
-            </>
-          )}
+          ) : null}
         </button>
       )}
-
-      {/* Action buttons */}
-      <div className="flex gap-2 pt-1 border-t border-border">
-        <button
-          onClick={() => onEdit(habit)}
-          className="flex-1 text-xs font-medium text-muted hover:text-ink py-1.5 rounded-lg
-                     hover:bg-canvas transition-all duration-150"
-          style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-        >
-          Edit
-        </button>
-        <button
-          onClick={() => void onArchive(habit.id, !habit.isArchived)}
-          className="flex-1 text-xs font-medium text-muted hover:text-ink py-1.5 rounded-lg
-                     hover:bg-canvas transition-all duration-150"
-          style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-        >
-          {habit.isArchived ? 'Unarchive' : 'Archive'}
-        </button>
-        <button
-          onClick={() => {
-            if (confirm(`Delete "${habit.title}"? This cannot be undone.`)) {
-              onDelete(habit.id).catch(() => {
-                onError(`Failed to delete "${habit.title}". Please try again.`);
-              });
-            }
-          }}
-          className="flex-1 text-xs font-medium text-red-500 hover:text-red-700 py-1.5 rounded-lg
-                     hover:bg-red-50 transition-all duration-150"
-          style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-        >
-          Delete
-        </button>
-      </div>
     </div>
   );
 }

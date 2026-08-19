@@ -2,12 +2,8 @@ import { useEffect } from 'react';
 import { useAuth } from '../store/authContext';
 import { useLeaderboard, type LeaderboardPeriod, type LeaderboardEntry } from '../hooks/useLeaderboard';
 
-// ─── Medal colours ────────────────────────────────────────────────────────────
-const MEDAL: Record<number, { emoji: string; bg: string; border: string; text: string }> = {
-  1: { emoji: '🥇', bg: 'rgba(212,175,55,0.12)',  border: 'rgba(212,175,55,0.4)',  text: '#A87C1A' },
-  2: { emoji: '🥈', bg: 'rgba(168,168,168,0.12)', border: 'rgba(168,168,168,0.4)', text: '#6B6B6B' },
-  3: { emoji: '🥉', bg: 'rgba(176,99,40,0.12)',   border: 'rgba(176,99,40,0.4)',   text: '#8B4513' },
-};
+// ─── Medal glyphs — a rank marker, not a colored card ─────────────────────────
+const MEDAL: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' };
 
 // ─── PeriodTab ────────────────────────────────────────────────────────────────
 function PeriodTab({ label, value: _value, active, onClick }: {
@@ -16,7 +12,7 @@ function PeriodTab({ label, value: _value, active, onClick }: {
   return (
     <button
       onClick={onClick}
-      className={`px-3 py-1.5 rounded-pill text-xs font-semibold transition-all duration-200 ${
+      className={`px-3 py-1.5 rounded-pill text-xs font-semibold transition-colors duration-150 ${
         active ? 'bg-ink text-white' : 'text-muted hover:text-ink border border-border hover:border-ink'
       }`}
       style={{ fontFamily: "'Space Grotesk', sans-serif" }}
@@ -29,11 +25,11 @@ function PeriodTab({ label, value: _value, active, onClick }: {
 // ─── SkeletonRow ──────────────────────────────────────────────────────────────
 function SkeletonRow(): JSX.Element {
   return (
-    <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl animate-pulse">
-      <div className="w-6 h-4 bg-border rounded" />
-      <div className="w-8 h-8 rounded-full bg-border shrink-0" />
-      <div className="flex-1 h-3.5 bg-border rounded w-1/3" />
-      <div className="w-12 h-3.5 bg-border rounded" />
+    <div className="flex items-center gap-3 px-3 py-2.5">
+      <div className="skeleton w-6 h-4" />
+      <div className="skeleton w-8 h-8 rounded-full shrink-0" />
+      <div className="skeleton flex-1 h-3.5 w-1/3" />
+      <div className="skeleton w-12 h-3.5" />
     </div>
   );
 }
@@ -45,22 +41,21 @@ function EntryRow({ entry, isMe }: { entry: LeaderboardEntry; isMe: boolean }): 
 
   return (
     <div
-      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 ${
-        isMe ? 'bg-lime/10 border border-lime/30' : 'hover:bg-canvas/60'
+      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-150 ${
+        isMe ? 'bg-lime/10 border-l-2 border-lime' : 'border-l-2 border-transparent hover:bg-canvas/60'
       }`}
-      style={medal ? { backgroundColor: medal.bg, border: `1px solid ${medal.border}` } : undefined}
     >
       {/* Rank */}
       <div
-        className="w-6 text-center font-bold shrink-0 text-xs"
-        style={{ color: medal ? medal.text : isMe ? 'var(--purple)' : 'var(--muted)', fontFamily: "'Space Grotesk', sans-serif" }}
+        className="w-6 text-center font-bold shrink-0 text-xs text-muted"
+        style={{ fontFamily: "'Space Grotesk', sans-serif" }}
       >
-        {medal ? medal.emoji : `#${entry.rank}`}
+        {medal ?? `#${entry.rank}`}
       </div>
 
       {/* Avatar */}
       {entry.avatarUrl ? (
-        <img src={entry.avatarUrl} alt={entry.username} className="w-8 h-8 rounded-full object-cover ring-2 ring-border shrink-0" />
+        <img src={entry.avatarUrl} alt={entry.username} className="w-8 h-8 rounded-full object-cover shrink-0" />
       ) : (
         <div
           className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
@@ -76,7 +71,7 @@ function EntryRow({ entry, isMe }: { entry: LeaderboardEntry; isMe: boolean }): 
           {entry.username}
         </p>
         {isMe && (
-          <span className="text-xs px-1.5 py-0.5 rounded-full shrink-0" style={{ background: 'var(--lime)', color: 'var(--ink)', fontWeight: 700 }}>
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full shrink-0 font-bold bg-lime text-ink">
             YOU
           </span>
         )}
@@ -84,8 +79,8 @@ function EntryRow({ entry, isMe }: { entry: LeaderboardEntry; isMe: boolean }): 
 
       {/* Score */}
       <div
-        className="text-xs font-bold shrink-0 tabular-nums"
-        style={{ fontFamily: "'JetBrains Mono', monospace", color: medal ? medal.text : isMe ? 'var(--purple)' : 'var(--ink)' }}
+        className="text-xs font-bold shrink-0 tabular-nums text-ink"
+        style={{ fontFamily: "'JetBrains Mono', monospace" }}
       >
         {entry.score.toLocaleString()}
         <span className="font-normal text-muted ml-0.5">pts</span>
@@ -122,7 +117,7 @@ export default function LeaderboardModal({ onClose }: LeaderboardModalProps): JS
 
       {/* Dropdown panel */}
       <div
-        className="absolute right-0 top-full mt-2 z-50 w-[400px] bg-surface rounded-2xl shadow-panel border border-border flex flex-col animate-fade-up"
+        className="absolute right-0 top-full mt-2 z-50 w-[400px] bg-surface rounded-xl shadow-panel border border-border flex flex-col animate-fade-up"
         style={{ maxHeight: '540px' }}
       >
         {/* Header */}
@@ -136,42 +131,33 @@ export default function LeaderboardModal({ onClose }: LeaderboardModalProps): JS
             {PERIODS.map((p) => (
               <PeriodTab key={p.value} label={p.label} value={p.value} active={period === p.value} onClick={() => setPeriod(p.value)} />
             ))}
-            <button onClick={onClose} className="ml-1 w-7 h-7 rounded-full flex items-center justify-center text-muted hover:bg-canvas hover:text-ink transition-all text-xs">
+            <button onClick={onClose} className="btn-icon w-7 h-7 ml-1 text-xs" aria-label="Close leaderboard">
               ✕
             </button>
           </div>
         </div>
 
-        {/* My rank banner */}
+        {/* My rank — a plain inline stat, not a gradient banner */}
         {myRank && (
-          <div
-            className="mx-4 mt-3 rounded-xl px-4 py-2.5 flex items-center gap-4 shrink-0"
-            style={{ background: 'linear-gradient(135deg, var(--purple) 0%, var(--sky) 100%)' }}
-          >
-            <div className="text-center">
-              <p className="text-white/60 text-[10px] font-semibold uppercase tracking-widest">Your rank</p>
-              <p className="text-white font-bold text-xl leading-none mt-0.5" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-                #{myRank.rank}
-              </p>
-            </div>
-            <div className="w-px h-8 bg-white/20" />
-            <div>
-              <p className="text-white/60 text-[10px] font-semibold uppercase tracking-widest">Score</p>
-              <p className="text-white font-bold text-base leading-none mt-0.5" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
-                {myRank.score.toLocaleString()} pts
-              </p>
-            </div>
+          <div className="mx-5 mt-3 flex items-center gap-2 text-xs text-muted shrink-0">
+            <span className="w-1.5 h-1.5 rounded-full bg-lime shrink-0" aria-hidden="true" />
+            You're ranked
+            <span className="font-bold text-ink" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>#{myRank.rank}</span>
+            <span aria-hidden="true">·</span>
+            <span className="font-semibold text-ink tabular-nums" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+              {myRank.score.toLocaleString()} pts
+            </span>
           </div>
         )}
 
         {!myRank && !loading && (
-          <div className="mx-4 mt-3 rounded-xl px-4 py-2.5 text-xs text-center shrink-0" style={{ background: 'rgba(108,92,231,0.08)', color: 'var(--purple)' }}>
-            Complete a habit check-in to appear on the leaderboard!
-          </div>
+          <p className="mx-5 mt-3 text-xs text-muted shrink-0">
+            Complete a habit check-in to appear on the leaderboard.
+          </p>
         )}
 
         {/* Board header */}
-        <div className="flex items-center gap-3 px-4 pt-3 pb-1 shrink-0">
+        <div className="flex items-center gap-3 px-4 pt-4 pb-1 shrink-0">
           <div className="w-6 label-upper text-[10px]">#</div>
           <div className="w-8 shrink-0" />
           <div className="flex-1 label-upper text-[10px]">Player</div>

@@ -20,6 +20,18 @@ export interface FeedItemData {
   createdAt:     string;
 }
 
+// ─── Avatar ───────────────────────────────────────────────────────────────────
+function FeedAvatar({ username, avatarUrl }: { username: string; avatarUrl: string | null }): JSX.Element {
+  if (avatarUrl) {
+    return <img src={avatarUrl} alt={username} className="w-9 h-9 rounded-full object-cover shrink-0" />;
+  }
+  return (
+    <div className="w-9 h-9 rounded-full bg-canvas border border-border flex items-center justify-center text-ink font-semibold text-sm shrink-0">
+      {username.charAt(0).toUpperCase()}
+    </div>
+  );
+}
+
 // ─── FriendFeed Component ─────────────────────────────────────────────────────
 export default function FriendFeed(): JSX.Element {
   const [items,    setItems]    = useState<FeedItemData[]>([]);
@@ -89,7 +101,7 @@ export default function FriendFeed(): JSX.Element {
       },
       createdAt:     payload.createdAt,
     };
-    
+
     // Add to top of feed with a subtle entry animation
     setItems((prev) => {
       // Prevent duplicates in case HTTP raced with socket
@@ -101,14 +113,14 @@ export default function FriendFeed(): JSX.Element {
   // ── Render ──────────────────────────────────────────────────────────────────
   if (loading && items.length === 0) {
     return (
-      <div className="card p-5 border-0 bg-transparent flex flex-col gap-4">
-        <h2 className="display-sm text-ink mb-2">Activity Feed</h2>
+      <div className="flex flex-col gap-4">
+        <h2 className="label-upper">Activity</h2>
         {[1, 2, 3].map((i) => (
-          <div key={i} className="animate-pulse flex items-center gap-4">
-            <div className="w-10 h-10 rounded-full bg-border/40" />
+          <div key={i} className="flex items-center gap-3">
+            <div className="skeleton w-9 h-9 rounded-full shrink-0" />
             <div className="flex-1 space-y-2">
-              <div className="h-4 bg-border/40 rounded w-3/4" />
-              <div className="h-3 bg-border/40 rounded w-1/2" />
+              <div className="skeleton h-3.5 w-3/4" />
+              <div className="skeleton h-3 w-1/3" />
             </div>
           </div>
         ))}
@@ -117,31 +129,30 @@ export default function FriendFeed(): JSX.Element {
   }
 
   return (
-    <div className="card p-5 border-0 bg-transparent flex flex-col gap-4">
-      <h2 className="display-sm text-ink">Activity Feed</h2>
-      
+    <div className="flex flex-col gap-4">
+      <h2 className="label-upper">Activity</h2>
+
       {error && <p className="text-red-500 text-sm">{error}</p>}
-      
+
       {items.length === 0 && !error ? (
-        <div className="text-center py-8">
-          <p className="text-muted text-sm">No activity yet. Add friends to see their progress here!</p>
+        <div className="py-8">
+          <p className="text-muted text-sm leading-relaxed">
+            No activity yet. Add friends to see their progress here.
+          </p>
         </div>
       ) : (
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col divide-y divide-border/60">
           {items.map((item) => (
-            <div key={item.id} className="flex items-start gap-4 p-3 rounded-xl hover:bg-canvas transition-colors animate-fade-up">
-              {item.avatarUrl ? (
-                <img src={item.avatarUrl} alt={item.username} className="w-10 h-10 rounded-full object-cover" />
-              ) : (
-                <div className="w-10 h-10 rounded-full bg-muted/20 flex items-center justify-center text-ink font-bold shrink-0">
-                  {item.username.charAt(0).toUpperCase()}
-                </div>
-              )}
-              
-              <div className="flex-1">
+            <div key={item.id} className="flex items-start gap-3 py-3.5 first:pt-0 animate-fade-up">
+              <FeedAvatar username={item.username} avatarUrl={item.avatarUrl} />
+
+              <div className="flex-1 min-w-0">
                 <p className="text-sm text-ink leading-snug">
-                  <strong>{item.username}</strong> completed{' '}
-                  <span className="inline-flex items-center gap-1 font-medium px-1.5 rounded" style={{ backgroundColor: `${item.habitColor}20`, color: item.habitColor }}>
+                  <strong className="font-semibold">{item.username}</strong> completed{' '}
+                  <span
+                    className="inline-flex items-center gap-1 font-medium px-1.5 py-px rounded"
+                    style={{ backgroundColor: `${item.habitColor}18`, color: item.habitColor }}
+                  >
                     <span>{item.habitIcon}</span>
                     {item.metadata?.habitTitle || item.habitTitle}
                   </span>
@@ -152,14 +163,14 @@ export default function FriendFeed(): JSX.Element {
               </div>
             </div>
           ))}
-          
+
           {hasMore && (
-            <button 
-              onClick={() => void loadMore()} 
+            <button
+              onClick={() => void loadMore()}
               disabled={loadingMore}
-              className="btn-ghost text-xs py-2 mt-2 w-full text-center"
+              className="btn-ghost text-xs py-2 mt-3 w-full text-center"
             >
-              {loadingMore ? 'Loading...' : 'Load more'}
+              {loadingMore ? 'Loading…' : 'Load more'}
             </button>
           )}
         </div>

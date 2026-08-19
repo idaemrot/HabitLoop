@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../store/authContext';
-import { HabitChecklistMockup } from '../components/UIMockups';
 
 // ─── Password strength helper ──────────────────────────────────────────────────
 function getPasswordStrength(pw: string): { score: number; label: string; color: string } {
@@ -15,7 +14,7 @@ function getPasswordStrength(pw: string): { score: number; label: string; color:
   if (score <= 1) return { score, label: 'Weak', color: '#ef4444' };
   if (score <= 2) return { score, label: 'Fair', color: '#f59e0b' };
   if (score <= 3) return { score, label: 'Good', color: '#74C0FC' };
-  return { score, label: 'Strong', color: '#D4FF4F' };
+  return { score, label: 'Strong', color: '#9DC200' };
 }
 
 // ─── Register Page ────────────────────────────────────────────────────────────
@@ -71,50 +70,10 @@ export default function RegisterPage(): JSX.Element {
   };
 
   return (
-    <div className="min-h-screen bg-canvas flex">
-      {/* ── Left — Accent panel (hidden on mobile) ────────────────────── */}
-      <div
-        className="hidden lg:flex flex-1 items-center justify-center p-16 relative overflow-hidden"
-        style={{ background: 'linear-gradient(135deg, #6C5CE7 0%, #74C0FC 100%)' }}
-      >
-        <div
-          className="absolute inset-0"
-          style={{
-            backgroundImage:
-              'linear-gradient(rgba(255,255,255,0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.07) 1px, transparent 1px)',
-            backgroundSize: '32px 32px',
-          }}
-        />
-        <div className="relative z-10 flex flex-col gap-6 items-center">
-          <div className="text-center mb-2">
-            <span className="badge-dark mb-4">Start for free</span>
-            <h2
-              className="text-white font-bold text-2xl mt-2"
-              style={{ fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '-0.02em' }}
-            >
-              Your first habit is <br /> one tap away
-            </h2>
-          </div>
-          <div className="animate-float">
-            <HabitChecklistMockup />
-          </div>
-          {/* Step pills */}
-          <div className="flex gap-2 mt-2">
-            {['Create account', 'Add habits', 'Build streak'].map((s, i) => (
-              <div key={s} className="flex items-center gap-1.5">
-                <span className={`step-pill ${i === 0 ? 'active' : ''}`}>{i + 1}</span>
-                <span className="text-white/60 text-xs">{s}</span>
-                {i < 2 && <span className="text-white/20 mx-1">→</span>}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* ── Right — Form ─────────────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col justify-center px-8 py-16 max-w-lg mx-auto w-full">
+    <div className="min-h-screen bg-canvas flex flex-col items-center justify-center px-6 py-16">
+      <div className="w-full max-w-sm">
         {/* Logo */}
-        <Link to="/" className="flex items-center gap-2 mb-12 group w-fit">
+        <Link to="/" className="flex items-center justify-center gap-2 mb-10 group w-fit mx-auto">
           <span
             className="font-bold text-ink group-hover:text-purple transition-colors"
             style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: '1.1rem' }}
@@ -123,7 +82,7 @@ export default function RegisterPage(): JSX.Element {
           </span>
         </Link>
 
-        <div className="mb-8">
+        <div className="mb-7 text-center">
           <h1 className="display-md text-ink mb-2">Create your account</h1>
           <p className="text-muted text-sm">
             Already have one?{' '}
@@ -134,12 +93,7 @@ export default function RegisterPage(): JSX.Element {
         </div>
 
         {/* Global error */}
-        {error && (
-          <div className="mb-5 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-center gap-2">
-            <span>⚠️</span>
-            <span>{error}</span>
-          </div>
-        )}
+        {error && <div className="banner-error mb-5">⚠️ {error}</div>}
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>
@@ -234,7 +188,7 @@ export default function RegisterPage(): JSX.Element {
             type="submit"
             disabled={!canSubmit}
             id="register-submit"
-            className="btn-lime w-full justify-center py-3.5 text-sm mt-2"
+            className="btn-lime w-full py-3.5 text-sm mt-2"
           >
             {loading ? (
               <span className="inline-flex items-center gap-2">

@@ -51,13 +51,14 @@ export default {
         'pill': '9999px',
         '2xl':  '1rem',
         '3xl':  '1.25rem',
-        '4xl':  '2rem',
       },
       boxShadow: {
-        'card':       '0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04)',
-        'card-hover': '0 4px 24px rgba(0,0,0,0.10)',
-        'lime':       '0 0 0 3px rgba(212,255,79,0.3)',
-        'panel':      '0 24px 64px rgba(0,0,0,0.5)',
+        // Subtle, constant — cards lean on border + spacing, not shadow growth.
+        'card':  '0 1px 2px rgba(15,15,15,0.04)',
+        // Used for floating surfaces (modals, dropdowns) sitting above content.
+        // Deliberately light — a light surface on a light canvas needs
+        // separation, not a dramatic drop shadow.
+        'panel': '0 10px 30px rgba(15,15,15,0.10), 0 2px 8px rgba(15,15,15,0.05)',
       },
       backgroundImage: {
         'gradient-accent': 'linear-gradient(135deg, #6C5CE7 0%, #74C0FC 100%)',

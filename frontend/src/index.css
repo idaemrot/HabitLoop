@@ -76,49 +76,98 @@ body {
   text-transform: uppercase;
   color: var(--muted);
 }
+.text-gradient {
+  background: linear-gradient(135deg, var(--purple) 0%, var(--sky) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ─── Accessibility: keyboard focus ──────────────────────────────────────────
+   Fallback for any interactive element that doesn't set its own focus-visible
+   ring via a component class below. Component classes (.btn-*, .input-field,
+   .btn-icon) define their own ring and this rule simply doesn't fire for them
+   since they already have a visible focus treatment. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid rgba(15, 15, 15, 0.45);
+  outline-offset: 2px;
+}
 
 /* ─── Component Layer ────────────────────────────────────────────────────── */
 @layer components {
 
   /* ── Buttons ─────────────────────────────────────────────────────────── */
+  /* Shared focus ring recipe — offset ring, not a glow. Applied per-variant
+     below because the ring color needs to read against each button's bg. */
   .btn-lime {
-    @apply inline-flex items-center gap-2 px-6 py-3 rounded-pill
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-pill
            text-sm font-semibold tracking-wide
-           bg-lime text-ink
-           transition-all duration-150 ease-in-out
-           hover:bg-lime-hover hover:shadow-lime
-           active:scale-95
-           disabled:opacity-40 disabled:cursor-not-allowed;
+           bg-lime text-ink border border-lime
+           transition-colors duration-150 ease-in-out
+           hover:bg-lime-hover hover:border-lime-hover
+           active:scale-[0.97]
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/30 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas
+           disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100;
     font-family: 'Space Grotesk', sans-serif;
   }
   .btn-dark {
-    @apply inline-flex items-center gap-2 px-6 py-3 rounded-pill
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-pill
            text-sm font-semibold tracking-wide
-           bg-ink text-white
-           transition-all duration-150 ease-in-out
-           hover:bg-opacity-80
-           active:scale-95
-           disabled:opacity-40 disabled:cursor-not-allowed;
+           bg-ink text-white border border-ink
+           transition-colors duration-150 ease-in-out
+           hover:bg-ink/85
+           active:scale-[0.97]
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime/60 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas
+           disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100;
     font-family: 'Space Grotesk', sans-serif;
   }
   .btn-ghost {
-    @apply inline-flex items-center gap-2 px-5 py-2.5 rounded-pill
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-pill
            text-sm font-medium
            border border-border text-ink bg-transparent
-           transition-all duration-150 ease-in-out
+           transition-colors duration-150 ease-in-out
            hover:border-ink hover:bg-ink hover:text-white
-           active:scale-95;
+           active:scale-[0.97]
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/30 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas
+           disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100;
     font-family: 'Space Grotesk', sans-serif;
+  }
+  /* Small icon-only button — close buttons, tab affordances, row actions.
+     Consolidates a pattern that was previously copy-pasted per component. */
+  .btn-icon {
+    @apply inline-flex items-center justify-center shrink-0
+           w-8 h-8 rounded-full text-muted
+           transition-colors duration-150
+           hover:bg-canvas hover:text-ink
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/30;
   }
 
   /* ── Cards ───────────────────────────────────────────────────────────── */
   .card {
-    @apply bg-surface rounded-2xl border border-border
-           shadow-card transition-shadow duration-200
-           hover:shadow-card-hover;
+    @apply bg-surface rounded-xl border border-border shadow-card
+           transition-colors duration-200 hover:border-ink/15;
   }
   .card-accent {
-    @apply bg-surface rounded-2xl border border-border shadow-panel relative overflow-hidden;
+    @apply bg-surface rounded-xl border border-border shadow-panel relative overflow-hidden;
+  }
+
+  /* ── Status banners (errors / notices) ──────────────────────────────── */
+  .banner-error {
+    @apply flex items-start gap-2.5 px-4 py-3 rounded-xl text-sm
+           bg-red-50 border border-red-200 text-red-700;
+  }
+  .banner-info {
+    @apply flex items-start gap-2.5 px-4 py-3 rounded-xl text-sm
+           bg-purple/[0.06] border border-purple/20 text-ink;
+  }
+
+  /* ── Loading skeletons ───────────────────────────────────────────────── */
+  .skeleton {
+    @apply animate-pulse bg-border/50 rounded-lg;
   }
 
   /* ── Dark Panel (floating overlay mockup) ────────────────────────────── */
@@ -220,13 +269,6 @@ body {
 }
 .animate-pulse-lime {
   animation: pulse-lime 1.5s ease-in-out infinite;
-}
-
-/* ─── Shadow utilities ────────────────────────────────────────────────────── */
-.shadow-panel {
-  box-shadow:
-    0 4px 6px -1px rgba(0, 0, 0, 0.06),
-    0 24px 48px -8px rgba(0, 0, 0, 0.12);
 }
 
 /* ─── Line clamp ──────────────────────────────────────────────────────────── */

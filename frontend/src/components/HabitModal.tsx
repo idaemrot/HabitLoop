@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import type { Habit, CreateHabitPayload, UpdateHabitPayload } from '../types';
+import { HabitIcon, HABIT_ICON_NAMES } from './HabitIcon';
 
-// ─── Palette & Icon options ───────────────────────────────────────────────────
+// ─── Palette options ────────────────────────────────────────────────────────
 const COLORS = [
   { hex: '#D4FF4F', label: 'Lime'   },
   { hex: '#6C5CE7', label: 'Purple' },
@@ -11,21 +12,6 @@ const COLORS = [
   { hex: '#00B894', label: 'Teal'   },
   { hex: '#E17055', label: 'Orange' },
   { hex: '#A29BFE', label: 'Lavender' },
-];
-
-const ICONS = [
-  { value: 'flame',  label: '🔥' },
-  { value: 'book',   label: '📖' },
-  { value: 'run',    label: '🏃' },
-  { value: 'meditate', label: '🧘' },
-  { value: 'water',  label: '💧' },
-  { value: 'barbell', label: '💪' },
-  { value: 'pen',    label: '✍️' },
-  { value: 'star',   label: '⭐' },
-  { value: 'moon',   label: '🌙' },
-  { value: 'apple',  label: '🍎' },
-  { value: 'music',  label: '🎵' },
-  { value: 'code',   label: '💻' },
 ];
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -126,8 +112,6 @@ export default function HabitModal({
 
   if (!open) return null;
 
-  const selectedIconLabel = ICONS.find((i) => i.value === icon)?.label ?? '🔥';
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ pointerEvents: 'none' }}>
       {/* Backdrop */}
@@ -139,7 +123,7 @@ export default function HabitModal({
 
       {/* Modal panel */}
       <div
-        className="relative z-10 w-full max-w-md bg-surface rounded-2xl shadow-panel
+        className="relative z-10 w-full max-w-md bg-surface rounded-xl shadow-panel
                    border border-border animate-fade-up flex flex-col"
         style={{ maxHeight: 'min(90vh, 640px)', pointerEvents: 'auto' }}
       >
@@ -153,12 +137,7 @@ export default function HabitModal({
               {isEdit ? 'Update your habit' : 'Build something new'}
             </h2>
           </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full flex items-center justify-center
-                       text-muted hover:bg-canvas hover:text-ink transition-all"
-            aria-label="Close modal"
-          >
+          <button onClick={onClose} className="btn-icon" aria-label="Close modal">
             ✕
           </button>
         </div>
@@ -166,11 +145,7 @@ export default function HabitModal({
         {/* Form */}
         <form onSubmit={handleSubmit} className="px-6 py-4 space-y-3 overflow-y-auto flex-1 min-h-0">
           {/* Global error */}
-          {error && (
-            <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">
-              ⚠️ {error}
-            </div>
-          )}
+          {error && <div className="banner-error">⚠️ {error}</div>}
 
           {/* Title */}
           <div>
@@ -259,18 +234,19 @@ export default function HabitModal({
             <div>
               <p className="text-xs font-medium text-ink mb-2">Icon</p>
               <div className="flex flex-wrap gap-1.5">
-                {ICONS.map((ic) => (
+                {HABIT_ICON_NAMES.map((name) => (
                   <button
-                    key={ic.value}
+                    key={name}
                     type="button"
-                    onClick={() => setIcon(ic.value)}
-                    className={`w-7 h-7 rounded-lg text-base flex items-center justify-center transition-all ${
-                      icon === ic.value
-                        ? 'bg-ink scale-110 ring-2 ring-ink ring-offset-1'
-                        : 'bg-canvas hover:bg-border'
+                    onClick={() => setIcon(name)}
+                    aria-label={name}
+                    className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
+                      icon === name
+                        ? 'bg-ink text-white scale-110 ring-2 ring-ink ring-offset-1'
+                        : 'bg-canvas text-ink hover:bg-border'
                     }`}
                   >
-                    {ic.label}
+                    <HabitIcon icon={name} width={14} height={14} />
                   </button>
                 ))}
               </div>
@@ -280,10 +256,10 @@ export default function HabitModal({
           {/* Preview pill */}
           <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-canvas border border-border">
             <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-base flex-shrink-0"
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-ink flex-shrink-0"
               style={{ backgroundColor: color }}
             >
-              {selectedIconLabel}
+              <HabitIcon icon={icon} width={16} height={16} />
             </div>
             <div>
               <p className="text-sm font-semibold text-ink leading-none">

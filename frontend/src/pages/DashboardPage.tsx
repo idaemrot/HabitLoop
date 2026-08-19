@@ -16,7 +16,7 @@ function EmptyState({ onAdd }: { onAdd: () => void }): JSX.Element {
   return (
     <div className="flex flex-col items-center justify-center py-24 text-center">
       <div
-        className="w-16 h-16 rounded-2xl flex items-center justify-center mb-6 animate-float bg-canvas border border-border shadow-sm text-ink font-bold font-mono text-2xl"
+        className="w-16 h-16 rounded-xl flex items-center justify-center mb-6 animate-float bg-canvas border border-border shadow-sm text-ink font-bold font-mono text-2xl"
       >
         H
       </div>
@@ -31,33 +31,39 @@ function EmptyState({ onAdd }: { onAdd: () => void }): JSX.Element {
   );
 }
 
-// ─── Stats bar ────────────────────────────────────────────────────────────────
-// `today` is computed once by the caller (in the user's own timezone — see
-// DashboardPage) and passed in, rather than each user of "today" deriving
-// its own UTC-based guess.
-function StatsBar({ habits, today }: { habits: Habit[]; today: string }): JSX.Element {
+// ─── Daily progress ───────────────────────────────────────────────────────────
+// Replaces a 4-box KPI grid with a single slim line: a progress bar for
+// "done today" (the number that actually matters day-to-day) plus two
+// lightweight secondary numbers as plain text — no cards, no shadows.
+function DailyProgress({ habits, today }: { habits: Habit[]; today: string }): JSX.Element {
   const total       = habits.length;
+  const done        = habits.filter((h) => h.streak?.lastCheckIn?.startsWith(today)).length;
+  const pct         = total > 0 ? Math.round((done / total) * 100) : 0;
   const totalStreak = habits.reduce((s, h) => s + (h.streak?.currentStreak ?? 0), 0);
   const best        = Math.max(0, ...habits.map((h) => h.streak?.longestStreak ?? 0));
-  const doneToday   = habits.filter((h) => h.streak?.lastCheckIn?.startsWith(today)).length;
-
-  const stats = [
-    { label: 'Habits',          value: total },
-    { label: 'Total streak',    value: `${totalStreak}d` },
-    { label: 'Best streak',     value: `${best}d` },
-    { label: 'Done today',      value: `${doneToday}/${total}` },
-  ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-      {stats.map((s) => (
-        <div key={s.label} className="card px-6 py-5 flex items-center gap-3">
-          <div>
-            <p className="display-sm text-ink text-2xl leading-none">{s.value}</p>
-            <p className="label-upper mt-1 tracking-wider text-muted/80">{s.label}</p>
-          </div>
+    <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-8 mb-8 pb-6 border-b border-border">
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-sm font-semibold text-ink">Today's progress</p>
+          <p className="text-sm text-muted tabular-nums">{done}/{total}</p>
         </div>
-      ))}
+        <div className="h-2 rounded-full bg-border/60 overflow-hidden">
+          <div
+            className="h-full rounded-full bg-lime transition-all duration-500 ease-out"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      </div>
+      <div
+        className="flex items-center gap-4 text-xs text-muted shrink-0"
+        style={{ fontFamily: "'JetBrains Mono', monospace" }}
+      >
+        <span>🔥 {totalStreak}d total</span>
+        <span className="w-px h-3 bg-border" aria-hidden="true" />
+        <span>Best {best}d</span>
+      </div>
     </div>
   );
 }
@@ -98,10 +104,11 @@ export default function DashboardPage(): JSX.Element {
   // browser's timezone only in the unlikely case `user` isn't loaded yet).
   // Computed once here so every "checked in today" comparison on this page
   // agrees with the backend, which always reasons in the user's timezone.
-  const today = toLocalDateString(
-    new Date(),
-    user?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
-  );
+  const timezone = user?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const today    = toLocalDateString(new Date(), timezone);
+  const formattedDate = new Intl.DateTimeFormat('en-US', {
+    weekday: 'long', month: 'long', day: 'numeric', timeZone: timezone,
+  }).format(new Date());
 
   return (
     <div className="min-h-screen bg-canvas">
@@ -113,8 +120,8 @@ export default function DashboardPage(): JSX.Element {
           </span>
         </Link>
 
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-muted hidden md:block">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <span className="text-sm text-muted hidden md:block mr-1">
             Hey, <strong className="text-ink">{user?.username}</strong>
           </span>
           <div className="relative">
@@ -137,46 +144,49 @@ export default function DashboardPage(): JSX.Element {
           </div>
           <button
             onClick={() => void logout()}
-            className="btn-ghost text-xs px-4 py-2"
+            className="btn-icon"
+            title="Sign out"
+            aria-label="Sign out"
           >
-            Sign out
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
           </button>
         </div>
       </nav>
 
       {/* ── Main content ─────────────────────────────────────────────────── */}
-      <main className="pt-24 pb-16 px-6 md:px-12 w-full max-w-[1800px] mx-auto">
-        {/* Page header */}
-        <div className="flex items-center justify-between mb-8">
+      <main className="pt-24 pb-16 px-6 md:px-12 w-full max-w-6xl mx-auto">
+        {/* Compact header — date + heading, not a marketing banner */}
+        <div className="flex items-end justify-between mb-6 gap-4">
           <div>
-            <p className="label-upper mb-1">Dashboard</p>
-            <h1 className="display-lg text-ink">Your habits</h1>
+            <p className="text-xs text-muted mb-1" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+              {formattedDate}
+            </p>
+            <h1 className="display-md text-ink">Your habits</h1>
           </div>
-          <button onClick={openCreate} className="btn-lime text-sm px-6 py-3">
+          <button onClick={openCreate} className="btn-lime text-sm px-5 py-2.5 shrink-0">
             + New habit
           </button>
         </div>
 
-        {/* Stats */}
-        {activeHabits.length > 0 && <StatsBar habits={activeHabits} today={today} />}
+        {/* Daily progress — one slim line, not four KPI boxes */}
+        {activeHabits.length > 0 && <DailyProgress habits={activeHabits} today={today} />}
 
         {/* Error state */}
-        {error && (
-          <div className="mb-6 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">
-            {error}
-          </div>
-        )}
+        {error && <div className="banner-error mb-6">{error}</div>}
 
         {/* Two-column layout for Habits + Feed */}
         <div className="flex flex-col lg:flex-row gap-12">
-          
-          {/* Main Column — Habits */}
+
+          {/* Main Column — Habits, as a list (rows), not an analytics card grid */}
           <div className="flex-1 min-w-0">
-            {/* Loading skeleton */}
             {loading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="flex flex-col gap-2">
                 {[1, 2, 3].map((i) => (
-                  <div key={i} className="card p-5 h-48 animate-pulse bg-border/40" />
+                  <div key={i} className="skeleton h-16" />
                 ))}
               </div>
             ) : habits.length === 0 ? (
@@ -186,12 +196,8 @@ export default function DashboardPage(): JSX.Element {
                 {/* Active habits */}
                 {activeHabits.length > 0 && (
                   <>
-                    <div className="flex items-center gap-3 mb-4">
-                      <hr className="divider flex-1" />
-                      <p className="label-upper">Active · {activeHabits.length}</p>
-                      <hr className="divider flex-1" />
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                    <p className="label-upper mb-3">Active · {activeHabits.length}</p>
+                    <div className="flex flex-col gap-2 mb-8">
                       {activeHabits.map((h) => (
                         <div key={h.id} className="animate-fade-up">
                           <HabitCard
@@ -215,7 +221,7 @@ export default function DashboardPage(): JSX.Element {
                   <div className="mt-4">
                     <button
                       onClick={() => setShowArchived((v) => !v)}
-                      className="flex items-center gap-2 text-xs text-muted hover:text-ink transition-colors mb-4"
+                      className="flex items-center gap-2 text-xs text-muted hover:text-ink transition-colors mb-3"
                       style={{ fontFamily: "'Space Grotesk', sans-serif" }}
                     >
                       <span>{showArchived ? '▼' : '▶'}</span>
@@ -223,7 +229,7 @@ export default function DashboardPage(): JSX.Element {
                     </button>
 
                     {showArchived && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-2">
                         {archivedHabits.map((h) => (
                           <HabitCard
                             key={h.id}
@@ -249,7 +255,7 @@ export default function DashboardPage(): JSX.Element {
           <aside className="w-full lg:w-[320px] shrink-0">
             <FriendFeed />
           </aside>
-          
+
         </div>
       </main>
 
@@ -261,8 +267,6 @@ export default function DashboardPage(): JSX.Element {
         onCreate={async (payload) => { await createHabit(payload); }}
         onUpdate={async (id, payload) => { await updateHabit(id, payload); }}
       />
-
-
 
       {/* ── Delete error toast ───────────────────────────────────── */}
       <Toast

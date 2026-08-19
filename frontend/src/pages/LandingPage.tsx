@@ -1,175 +1,180 @@
 import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../store/authContext';
+import { HabitIcon, type HabitIconName } from '../components/HabitIcon';
 
+// ─── Product preview ──────────────────────────────────────────────────────────
+// A real recreation of the actual dashboard UI (same tokens, same HabitCard
+// pattern — color edge accent, icon badge, streak line, circular check
+// control) rather than a generic illustration. This is what "show the
+// product" means here.
+function DashboardPreview(): JSX.Element {
+  const rows: Array<{ icon: HabitIconName; color: string; title: string; streak: number; done: boolean }> = [
+    { icon: 'meditate', color: '#6C5CE7', title: 'Morning meditation', streak: 14, done: true },
+    { icon: 'book',     color: '#74C0FC', title: 'Read 30 min',        streak: 7,  done: true },
+    { icon: 'run',      color: '#D4FF4F', title: 'Evening run',        streak: 3,  done: false },
+  ];
+
+  return (
+    <div className="card p-5 w-full max-w-md">
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-sm font-semibold text-ink">Today's progress</p>
+        <p className="text-sm text-muted tabular-nums">2/3</p>
+      </div>
+      <div className="h-2 rounded-full bg-border/60 overflow-hidden mb-5">
+        <div className="h-full rounded-full bg-lime" style={{ width: '66%' }} />
+      </div>
+      <div className="flex flex-col gap-1">
+        {rows.map((r) => (
+          <div
+            key={r.title}
+            className="flex items-center gap-3 py-2 pl-3"
+            style={{ borderLeft: `3px solid ${r.color}` }}
+          >
+            <div
+              className="w-9 h-9 rounded-lg flex items-center justify-center text-ink shrink-0"
+              style={{ backgroundColor: r.color, opacity: r.done ? 0.65 : 1 }}
+            >
+              <HabitIcon icon={r.icon} width={16} height={16} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p
+                className={`text-sm font-semibold truncate ${r.done ? 'text-muted' : 'text-ink'}`}
+                style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+              >
+                {r.title}
+              </p>
+              <p className="text-xs text-muted mt-0.5">🔥 {r.streak} days</p>
+            </div>
+            <div
+              className={`w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                r.done ? 'bg-lime border-lime text-ink' : 'border-border'
+              }`}
+            >
+              {r.done && (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 // ─── Marketing Landing Page ───────────────────────────────────────────────────
 export default function LandingPage(): JSX.Element {
   const { user } = useAuth();
+
+  const benefits = [
+    'One tap to check in — streaks and best-ever are calculated for you',
+    "See friends' progress the moment they check in",
+    'Compete on a live weekly, monthly, and all-time leaderboard',
+  ];
+
+  const steps = [
+    { title: 'Define your habits', body: 'Add a name, frequency, color, and icon. Takes 30 seconds.' },
+    { title: 'Check in daily',     body: 'One tap to log completion. Streaks calculated automatically.' },
+    { title: 'Stay accountable',   body: 'Friends see your progress, and the leaderboard keeps you honest.' },
+  ];
+
   return (
     <div className="min-h-screen bg-canvas">
       <Navbar />
 
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
-      <section className="pt-32 pb-20 px-6 max-w-6xl mx-auto">
+      <section id="features" className="pt-32 pb-20 px-6 max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-[1.1fr,1fr] gap-16 items-center">
+          {/* Copy */}
+          <div>
+            <h1 className="display-xl text-left text-ink mb-6 animate-fade-up animate-delay-100">
+              Build habits that{' '}
+              <span className="relative inline-block mt-2">
+                <span className="bg-lime px-4 py-1 rounded-xl border border-border shadow-sm inline-block -rotate-1">actually stick.</span>
+              </span>
+            </h1>
+            <p className="text-left text-muted text-lg animate-fade-up animate-delay-200 max-w-lg mb-8 leading-relaxed">
+              Track your habits, check in once a day, and let HabitLoop keep score of the streak.
+            </p>
 
-        <h1 className="display-xl text-left text-ink mb-6 animate-fade-up animate-delay-100 max-w-2xl">
-          Build habits that{' '}
-          <span className="relative inline-block mt-2">
-            <span className="bg-lime px-4 py-1 rounded-xl border border-border shadow-sm inline-block -rotate-1">actually stick.</span>
-          </span>
-        </h1>
-        <p className="text-left text-muted text-lg animate-fade-up animate-delay-200 max-w-lg mb-10 leading-relaxed">
-          HabitLoop turns your intentions into streaks. Track, analyze, and repeat — every single day.
-        </p>
-        <div className="flex items-center justify-start gap-4 animate-fade-up animate-delay-300">
-          {user ? (
-            <Link to="/dashboard" className="btn-lime text-sm px-8 py-3.5">Go to Dashboard →</Link>
-          ) : (
-            <Link to="/signup" className="btn-lime text-sm px-8 py-3.5">Start for free →</Link>
-          )}
-          <a href="#how-it-works" className="btn-ghost text-sm px-8 py-3.5">See how it works</a>
-        </div>
-        <p className="text-left text-xs text-muted mt-6 animate-fade-up animate-delay-400">
-          Trusted by <strong className="text-ink">2,400+</strong> builders, athletes, and makers
-        </p>
-      </section>
+            <ul className="flex flex-col gap-3 mb-9 animate-fade-up animate-delay-300 max-w-md">
+              {benefits.map((b) => (
+                <li key={b} className="flex items-start gap-3">
+                  <span className="w-1.5 h-1.5 rounded-full bg-lime-dark shrink-0 mt-2" aria-hidden="true" />
+                  <p className="text-sm text-ink leading-relaxed">{b}</p>
+                </li>
+              ))}
+            </ul>
 
-      {/* ── Feature Cards ──────────────────────────────────────────────────── */}
-      <section id="features" className="px-6 pb-32 max-w-6xl mx-auto">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="flex flex-col gap-4 animate-fade-up animate-delay-100">
-            <div className="bg-white border border-border rounded-2xl p-6 shadow-sm flex-1 min-h-[220px] flex items-center justify-center relative overflow-hidden group">
-              <div className="w-full max-w-[200px] space-y-3">
-                {[
-                  { name: 'Morning run', color: '#D4FF4F', checked: true },
-                  { name: 'Read 10 pages', color: '#74C0FC', checked: false },
-                  { name: 'Meditate', color: '#6C5CE7', checked: false },
-                ].map((h, i) => (
-                  <div key={i} className="flex items-center gap-3 p-2 rounded-xl border border-border/50 bg-canvas/30">
-                    <div className={`w-5 h-5 rounded-md border flex items-center justify-center ${h.checked ? 'bg-ink border-ink' : 'border-border bg-white'}`}>
-                      {h.checked && <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>}
-                    </div>
-                    <span className={`text-sm ${h.checked ? 'text-muted line-through' : 'text-ink font-medium'}`}>{h.name}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div>
-              <span className="badge-dark mb-2">Daily view</span>
-              <h3 className="display-sm text-ink mt-1">Check in on your habits</h3>
-              <p className="text-muted text-sm mt-1">A beautiful checklist for every day.</p>
+            <div className="flex items-center gap-4 animate-fade-up animate-delay-400">
+              {user ? (
+                <Link to="/dashboard" className="btn-lime text-sm px-8 py-3.5">Go to Dashboard →</Link>
+              ) : (
+                <Link to="/signup" className="btn-lime text-sm px-8 py-3.5">Start for free →</Link>
+              )}
+              <a href="#how-it-works" className="btn-ghost text-sm px-8 py-3.5">See how it works</a>
             </div>
           </div>
-          <div className="flex flex-col gap-4 animate-fade-up animate-delay-200 mt-0 md:mt-12">
-            <div className="bg-white border border-border rounded-2xl p-6 shadow-sm flex-1 min-h-[220px] flex flex-col items-center justify-end relative overflow-hidden group">
-              <div className="flex items-end gap-2 h-32 w-full justify-center opacity-80">
-                {[40, 70, 45, 90, 65, 80, 100].map((h, i) => (
-                  <div key={i} className="w-6 bg-lime border border-border rounded-t-md" style={{ height: `${h}%` }} />
-                ))}
-              </div>
-              <div className="flex gap-2 w-full justify-center mt-2">
-                {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
-                  <span key={i} className="w-6 text-center text-[10px] text-muted font-medium">{d}</span>
-                ))}
-              </div>
-            </div>
-            <div>
-              <span className="badge-lime mb-2">Analytics</span>
-              <h3 className="display-sm text-ink mt-1">See your weekly progress</h3>
-              <p className="text-muted text-sm mt-1">Visual breakdowns of streaks and completion rate.</p>
-            </div>
-          </div>
-          <div className="flex flex-col gap-4 animate-fade-up animate-delay-300 mt-0 md:mt-24">
-            <div className="bg-white border border-border rounded-2xl p-6 shadow-sm flex-1 min-h-[220px] flex flex-col items-center justify-center relative overflow-hidden group">
-              <div className="text-center">
-                <span className="text-4xl block mb-2">🔥</span>
-                <span className="display-sm text-ink block">14 days</span>
-                <span className="text-xs text-muted uppercase tracking-wider font-semibold">Current Streak</span>
-              </div>
-            </div>
-            <div>
-              <span className="badge-dark mb-2">Streaks</span>
-              <h3 className="display-sm text-ink mt-1">Your longest streak ever</h3>
-              <p className="text-muted text-sm mt-1">Every day counts.</p>
-            </div>
+
+          {/* Product preview */}
+          <div className="flex justify-center lg:justify-end animate-fade-up animate-delay-300">
+            <DashboardPreview />
           </div>
         </div>
       </section>
 
-      {/* ── How it works ───────────────────────────────────────────────────── */}
-      <section id="how-it-works" className="py-24 px-6 max-w-3xl mx-auto">
-        <div className="mb-16 text-left">
-          <p className="label-upper mb-3">Process</p>
-          <h2 className="display-lg text-ink">Three steps to better habits</h2>
-        </div>
-        <div className="flex flex-col gap-12">
-          {[
-            { step: 1, title: 'Define your habits', body: 'Add a name, frequency, and icon. Takes 30 seconds.' },
-            { step: 2, title: 'Check in daily', body: 'One tap to log completion. Streaks calculated automatically.' },
-            { step: 3, title: 'Review and grow', body: 'Weekly digest with your wins, streaks, and suggestions.' },
-          ].map((s) => (
-            <div key={s.step} className="flex gap-6 items-start">
-              <span className={`step-pill flex-shrink-0 mt-1 ${s.step === 1 ? 'active' : ''}`}>{s.step}</span>
-              <div>
-                <h3 className="display-sm text-ink mb-2">{s.title}</h3>
-                <p className="text-muted text-lg leading-relaxed max-w-xl">{s.body}</p>
-              </div>
+      {/* ── How it works ─────────────────────────────────────────────────────
+          Three columns separated by a rule, with an oversized outline numeral
+          as the marker — a typographic device instead of the numbered-circle
+          checklist pattern, and it reads as one glance instead of a scroll. */}
+      <section id="how-it-works" className="py-20 px-6 max-w-6xl mx-auto border-t border-border">
+        <p className="label-upper mb-10">How it works</p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-10 md:gap-8">
+          {steps.map((s, i) => (
+            <div key={s.title} className={i > 0 ? 'md:pl-8 md:border-l md:border-border' : ''}>
+              <span
+                className="block text-6xl font-bold leading-none mb-4 select-none"
+                style={{ fontFamily: "'Space Grotesk', sans-serif", color: 'var(--border)' }}
+                aria-hidden="true"
+              >
+                0{i + 1}
+              </span>
+              <h3 className="display-sm text-ink mb-2">{s.title}</h3>
+              <p className="text-muted text-sm leading-relaxed">{s.body}</p>
             </div>
           ))}
         </div>
       </section>
 
-      <hr className="divider max-w-6xl mx-auto my-12" />
-
-
-
-      {/* ── Why I built this ─────────────────────────────────────────────────
-      <section className="py-24 px-6 max-w-3xl mx-auto text-left">
-        <div className="bg-white rounded-3xl p-10 md:p-14 border border-border shadow-sm relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-2 h-full bg-lime" />
-          <h3 className="display-sm text-ink mb-6">Why I built this</h3>
-          <p className="text-muted text-lg leading-relaxed mb-8 italic">
-            "I tried every habit tracker out there. They were either too bloated with features I didn't need, or too simple to actually motivate me. I just wanted something fast, beautiful, and reliable that synced instantly across my devices. So I built HabitLoop."
-          </p>
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-canvas border border-border flex items-center justify-center text-muted font-bold">M</div>
-            <div>
-              <p className="font-bold text-ink text-sm">Maker</p>
-              <p className="text-xs text-muted">Building HabitLoop</p>
-            </div>
+      {/* ── Closing CTA + footer, combined into one compact strip ───────────── */}
+      <footer className="border-t border-border">
+        <div className="max-w-6xl mx-auto px-6 py-16 flex flex-col md:flex-row md:items-center justify-between gap-8">
+          <div>
+            <h2 className="display-md text-ink mb-1.5">
+              {user ? 'Ready to continue?' : 'Ready when you are.'}
+            </h2>
+            <p className="text-muted text-sm">
+              {user ? 'Head to your dashboard to manage your habits.' : 'Free forever — takes about 30 seconds to set up.'}
+            </p>
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
+            {user ? (
+              <Link to="/dashboard" className="btn-lime text-sm px-7 py-3">Dashboard →</Link>
+            ) : (
+              <>
+                <Link to="/signup" className="btn-lime text-sm px-7 py-3">Create free account →</Link>
+                <Link to="/login" className="btn-ghost text-sm px-7 py-3">Sign in</Link>
+              </>
+            )}
           </div>
         </div>
-      </section> */}
-
-      {/* ── CTA ──────────────────────────────────────────────────────────────── */}
-      <section className="py-32 px-6 max-w-6xl mx-auto text-center">
-        <p className="label-upper mb-4">Get started</p>
-        <h2 className="display-lg text-ink mb-4" style={{ maxWidth: '600px', margin: '0 auto 1rem' }}>
-          {user ? 'Ready to continue?' : 'Start your first streak today'}
-        </h2>
-        <p className="text-muted mb-10 max-w-md mx-auto text-lg">
-          {user ? 'Head to your dashboard to manage your habits.' : 'Free forever. No credit card. Works on every device.'}
-        </p>
-        <div className="flex items-center justify-center gap-4">
-          {user ? (
-            <Link to="/dashboard" className="btn-lime text-sm px-10 py-4">Dashboard →</Link>
-          ) : (
-            <>
-              <Link to="/signup" className="btn-lime text-sm px-10 py-4">Create free account →</Link>
-              <Link to="/login" className="btn-ghost text-sm px-10 py-4">Sign in</Link>
-            </>
-          )}
-        </div>
-      </section>
-
-      {/* ── Footer ───────────────────────────────────────────────────────────── */}
-      <footer className="border-t border-border py-12 px-6">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <span className="display-sm text-ink text-sm" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>HabitLoop</span>
+        <div className="border-t border-border">
+          <div className="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
+            <span className="text-sm font-bold text-ink" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>HabitLoop</span>
+            <p className="text-xs text-muted">© 2024 HabitLoop</p>
           </div>
-          <p className="text-xs text-muted">© 2024 HabitLoop. Built with consistent habits.</p>
         </div>
       </footer>
     </div>

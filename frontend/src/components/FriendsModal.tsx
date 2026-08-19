@@ -119,7 +119,7 @@ export default function FriendsModal({ onClose }: FriendsModalProps): JSX.Elemen
 
       {/* Dropdown panel — anchored below the button via absolute on the relative wrapper */}
       <div
-        className="absolute right-0 top-full mt-2 z-50 w-[420px] bg-surface rounded-2xl shadow-panel border border-border flex flex-col animate-fade-up"
+        className="absolute right-0 top-full mt-2 z-50 w-[420px] bg-surface rounded-xl shadow-panel border border-border flex flex-col animate-fade-up"
         style={{ maxHeight: '520px' }}
       >
         {/* Header */}
@@ -128,10 +128,7 @@ export default function FriendsModal({ onClose }: FriendsModalProps): JSX.Elemen
             <p className="label-upper">Social</p>
             <h2 className="display-sm text-ink mt-0.5">Friends</h2>
           </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-muted hover:bg-canvas hover:text-ink transition-all"
-          >
+          <button onClick={onClose} className="btn-icon" aria-label="Close friends panel">
             ✕
           </button>
         </div>
@@ -192,7 +189,7 @@ export default function FriendsModal({ onClose }: FriendsModalProps): JSX.Elemen
                 const alreadyFriend = friends.some((f) => f.friend.id === user.id);
                 const sent = sentIds.has(user.id);
                 return (
-                  <div key={user.id} className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border bg-white">
+                  <div key={user.id} className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border bg-surface">
                     <Avatar user={user} />
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-ink text-sm truncate" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
@@ -219,14 +216,14 @@ export default function FriendsModal({ onClose }: FriendsModalProps): JSX.Elemen
           {tab === 'requests' && (
             <div className="flex flex-col gap-3">
               {loadingPending ? (
-                [1, 2].map((i) => <div key={i} className="h-14 rounded-xl animate-pulse bg-border/30" />)
+                [1, 2].map((i) => <div key={i} className="h-14 rounded-xl skeleton" />)
               ) : pending.length === 0 ? (
                 <div className="text-center py-10">
                   <p className="text-muted text-sm">No pending requests</p>
                   <button onClick={() => setTab('search')} className="btn-lime text-xs px-5 py-2 mt-4">Find people</button>
                 </div>
               ) : pending.map((req) => (
-                <div key={req.id} className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border bg-white">
+                <div key={req.id} className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border bg-surface">
                   <Avatar user={req.requester} />
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-ink text-sm truncate" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
@@ -247,14 +244,14 @@ export default function FriendsModal({ onClose }: FriendsModalProps): JSX.Elemen
           {tab === 'friends' && (
             <div className="flex flex-col gap-3">
               {loadingFriends ? (
-                [1, 2, 3].map((i) => <div key={i} className="h-14 rounded-xl animate-pulse bg-border/30" />)
+                [1, 2, 3].map((i) => <div key={i} className="h-14 rounded-xl skeleton" />)
               ) : friends.length === 0 ? (
                 <div className="text-center py-10">
                   <p className="text-muted text-sm">No friends yet</p>
                   <button onClick={() => setTab('search')} className="btn-lime text-xs px-5 py-2 mt-4">Find people</button>
                 </div>
               ) : friends.map(({ friendship, friend }) => (
-                <div key={friendship.id} className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border bg-white">
+                <div key={friendship.id} className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border bg-surface">
                   <Avatar user={friend} />
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-ink text-sm truncate" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
